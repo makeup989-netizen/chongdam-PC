@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>청담대교 Digital Twin — 센서 모니터링 (PC)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap');
+
+  :root {
+    --bg:      #080C14;
+    --panel:   #0D1420;
+    --border:  #1A2640;
+    --accent:  #00E5CC;
+    --warn:    #F0A030;
+    --danger:  #E84040;
+    --safe:    #30C080;
+    --text:    #C8D8E8;
+    --textMut: #5A7A99;
+    --mono:    'IBM Plex Mono', monospace;
+    --sans:    'Noto Sans KR', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 48px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .header-left { display:flex; align-items:center; gap:14px; }
+  .logo-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.85)} }
+  .logo-text { font-family:var(--mono); font-size:12px; color:var(--accent); letter-spacing:.12em; }
+  .logo-sub { font-size:11px; color:var(--textMut); letter-spacing:.06em; }
+  .header-right { display:flex; align-items:center; gap:20px; }
+  .status-badge {
+    display:flex; align-items:center; gap:6px;
+    padding:4px 10px; border-radius:20px;
+    border:1px solid var(--safe);
+    font-family:var(--mono); font-size:10px; color:var(--safe);
+  }
+  .status-dot { width:5px; height:5px; border-radius:50%; background:var(--safe); animation:pulse 1.5s ease-in-out infinite; }
+  .time-display { font-family:var(--mono); font-size:11px; color:var(--textMut); }
+
+  .main { display:flex; flex:1; overflow:hidden; }
+
+  #canvas-wrap { flex:1; position:relative; overflow:hidden; }
+  canvas { display:block; }
+
+  .overlay-controls {
+    position:absolute; top:14px; left:14px;
+    display:flex; flex-direction:column; gap:6px; z-index:5;
+  }
+  .ctrl-btn {
+    background:rgba(13,20,32,.85);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--mono); font-size:10px;
+    padding:6px 12px; cursor:pointer;
+    border-radius:4px; letter-spacing:.05em;
+    transition: border-color .2s, color .2s;
+    backdrop-filter:blur(6px);
+  }
+  .ctrl-btn:hover, .ctrl-btn.active { border-color:var(--accent); color:var(--accent); }
+
+  #loading-overlay {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(13,20,32,.95);
+    border:1px solid var(--border);
+    border-radius:8px; padding:24px 36px;
+    font-family:var(--mono); font-size:12px;
+    color:var(--accent); letter-spacing:.08em;
+    z-index:10; text-align:center;
+  }
+  #loading-overlay .load-bar-wrap {
+    width:200px; height:3px; background:var(--border);
+    border-radius:2px; margin-top:12px; overflow:hidden;
+  }
+  #loading-bar { height:100%; width:0%; background:var(--accent); border-radius:2px; transition:width .3s; }
+  #load-progress { color:var(--textMut); font-size:10px; margin-top:6px; }
+
+  .legend {
+    position:absolute; bottom:14px; right:14px;
+    background:rgba(13,20,32,.85);
+    border:1px solid var(--border);
+    border-radius:6px; padding:10px 14px;
+    font-family:var(--mono); font-size:10px;
+    backdrop-filter:blur(6px);
+  }
+  .legend-title { color:var(--textMut); margin-bottom:8px; letter-spacing:.08em; }
+  .legend-item { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .legend-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+  .scale-display {
+    position:absolute; bottom:14px; left:14px;
+    background:rgba(13,20,32,.8);
+    border:1px solid var(--border);
+    border-radius:4px; padding:8px 12px;
+    font-family:var(--mono); font-size:10px;
+    color:var(--textMut); backdrop-filter:blur(6px);
+  }
+  .scale-display span { color:var(--accent); }
+
+  .deform-control {
+    position:absolute; top:14px; right:14px;
+    background:rgba(13,20,32,.85);
+    border:1px solid var(--border);
+    border-radius:6px; padding:10px 14px;
+    font-family:var(--mono); font-size:10px;
+    backdrop-filter:blur(6px); z-index:5; min-width:160px;
+  }
+  .deform-label { color:var(--textMut); margin-bottom:6px; }
+  .deform-label span { color:var(--accent); }
+  input[type=range] { width:100%; accent-color:var(--accent); height:3px; cursor:pointer; }
+
+  #graph-popup {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    min-width: 320px;
+    min-height: 300px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    z-index: 20;
+    display: none;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    resize: both;
+    overflow: auto;
+    user-select: none;
+  }
+  #graph-popup.show { display: block; }
+  #graph-popup.dragging { opacity: 0.9; cursor: grabbing; }
+  .popup-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+    cursor: grab;
+  }
+  .popup-header:active { cursor: grabbing; }
+  .popup-title { font-family:var(--mono); font-size:13px; color:var(--accent); }
+  .popup-close {
+    background:none; border:1px solid var(--border);
+    color:var(--textMut); cursor:pointer;
+    width:24px; height:24px; border-radius:4px;
+    font-size:14px; display:flex; align-items:center; justify-content:center;
+    transition: border-color .2s, color .2s;
+  }
+  .popup-close:hover { border-color:var(--danger); color:var(--danger); }
+  .period-btn {
+    flex:1; padding:4px 0; background:var(--border); border:1px solid var(--border);
+    color:var(--textMut); font-family:var(--mono); font-size:10px; cursor:pointer;
+    border-radius:3px; transition:all .15s;
+  }
+  .period-btn.active { background:var(--accent); border-color:var(--accent); color:#000; font-weight:500; }
+  .period-btn:hover:not(.active) { border-color:var(--accent); color:var(--accent); }
+  #graph-canvas { width:100%; height:180px; }
+  .popup-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+  .stat-box { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
+  .stat-label { font-family:var(--mono); font-size:9px; color:var(--textMut); margin-bottom:4px; }
+  .stat-val { font-family:var(--mono); font-size:14px; color:#fff; font-weight:500; }
+
+  .side-panel {
+    width:300px; flex-shrink:0;
+    border-left:1px solid var(--border);
+    background:var(--panel);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .panel-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .tab {
+    flex:1; padding:10px 0; text-align:center;
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+    color:var(--textMut); cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition: color .2s, border-color .2s;
+  }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .panel-content { flex:1; overflow-y:auto; padding:12px; }
+  .panel-content::-webkit-scrollbar { width:4px; }
+  .panel-content::-webkit-scrollbar-track { background:transparent; }
+  .panel-content::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .sensor-section-title {
+    font-family:var(--mono); font-size:9px; letter-spacing:.12em;
+    color:var(--textMut); margin:10px 0 6px; text-transform:uppercase;
+  }
+  .sensor-card {
+    background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:10px; margin-bottom:6px;
+    cursor:pointer; transition: border-color .2s, background .2s;
+    position:relative; overflow:hidden;
+  }
+  .sensor-card::before {
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:var(--card-color, var(--accent));
+  }
+  .sensor-card:hover { border-color:var(--card-color, var(--accent)); background:#0A1018; }
+  .sensor-card.selected { border-color:var(--card-color, var(--accent)); background:#0A1018; }
+  .sc-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .sc-id { font-family:var(--mono); font-size:10px; color:var(--text); }
+  .sc-status { font-family:var(--mono); font-size:9px; padding:2px 7px; border-radius:10px; border:1px solid currentColor; }
+  .sc-status.safe { color:var(--safe); }
+  .sc-status.warn { color:var(--warn); }
+  .sc-status.danger { color:var(--danger); }
+  .sc-val { font-family:var(--mono); font-size:18px; color:#fff; font-weight:500; }
+  .sc-unit { font-family:var(--mono); font-size:10px; color:var(--textMut); margin-left:4px; }
+  .sc-type { font-size:10px; color:var(--textMut); margin-top:2px; }
+  .mini-chart { height:28px; margin-top:7px; display:flex; align-items:flex-end; gap:2px; }
+  .mini-bar { flex:1; border-radius:2px 2px 0 0; min-height:3px; transition:height .5s ease; }
+
+  footer {
+    height:28px; border-top:1px solid var(--border);
+    background:var(--panel);
+    display:flex; align-items:center;
+    padding:0 16px; gap:20px;
+    font-family:var(--mono); font-size:9px;
+    color:var(--textMut); flex-shrink:0;
+  }
+  .footer-item { display:flex; align-items:center; gap:5px; }
+  .footer-dot { width:5px; height:5px; border-radius:50%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-dot"></div>
+    <div>
+      <div class="logo-text">CHONGDAM BRIDGE · DIGITAL TWIN</div>
+      <div class="logo-sub">청담대교 계측 센서 실시간 모니터링</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge"><div class="status-dot"></div>LIVE</div>
+    <div class="time-display" id="time-display">--:--:--</div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="canvas-wrap">
+    <canvas id="three-canvas"></canvas>
+    <div id="loading-overlay">
+      <div>모델 로딩 중...</div>
+      <div class="load-bar-wrap"><div id="loading-bar"></div></div>
+      <div id="load-progress">0%</div>
+    </div>
+    <div class="overlay-controls">
+      <button class="ctrl-btn active" onclick="setView('perspective')">3D VIEW</button>
+      <button class="ctrl-btn" onclick="setView('top')">TOP</button>
+      <button class="ctrl-btn" onclick="setView('side')">SIDE</button>
+      <button class="ctrl-btn" id="deform-toggle" onclick="toggleDeform()">DEFORM ON</button>
+    </div>
+    <div class="deform-control">
+      <div class="deform-label">변형 배율: <span id="scale-val">50</span>×</div>
+      <input type="range" id="scale-slider" min="1" max="200" value="50" oninput="updateScale(this.value)">
+    </div>
+    <div class="legend">
+      <div class="legend-title">상태평가 등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2196F3"></div>A등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4CAF50"></div>B등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FFEB3B"></div>C등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FF9800"></div>D등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F44336"></div>E등급</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#888888"></div>미평가</div>
+    </div>
+    <div class="scale-display">배율 <span id="footer-scale">50</span>× 과장 표현 중</div>
+    <div id="graph-popup">
+      <div class="popup-header">
+        <div class="popup-title" id="popup-title">--</div>
+        <button class="popup-close" onclick="closePopup()">✕</button>
+      </div>
+      <div id="period-tabs" style="display:flex;gap:4px;margin-bottom:10px;">
+        <button class="period-btn active" onclick="setPeriod('10m')">10분</button>
+        <button class="period-btn" onclick="setPeriod('1h')">1시간</button>
+        <button class="period-btn" onclick="setPeriod('1d')">일</button>
+        <button class="period-btn" onclick="setPeriod('1mo')">월</button>
+        <button class="period-btn" onclick="setPeriod('1y')">연</button>
+      </div>
+      <canvas id="graph-canvas" height="180"></canvas>
+      <div class="popup-stats">
+        <div class="stat-box"><div class="stat-label">최신값</div><div class="stat-val" id="stat-cur">--</div></div>
+        <div class="stat-box"><div class="stat-label">최댓값</div><div class="stat-val" id="stat-max">--</div></div>
+        <div class="stat-box"><div class="stat-label">평균값</div><div class="stat-val" id="stat-avg">--</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <div class="panel-tabs">
+      <div class="tab active" onclick="switchTab(this,'sensors')">SENSORS</div>
+      <div class="tab" onclick="switchTab(this,'info')">INFO</div>
+    </div>
+    <div class="panel-content" id="tab-sensors"></div>
+    <div class="panel-content" id="tab-info" style="display:none">
+      <div class="sensor-section-title">프로젝트 정보</div>
+      <div class="sensor-card" style="--card-color:#7B5EA7">
+        <div class="sc-type" style="color:var(--text);line-height:1.7">
+          청담대교 계측 센서 모니터링<br>
+          Revit 2026 Add-in 연계<br><br>
+          <span style="color:var(--textMut)">데이터 주기:</span> 10분 간격<br>
+          <span style="color:var(--textMut)">센서 종류:</span> 5종 14채널<br>
+          <span style="color:var(--textMut)">모델:</span> Revit IFC → GLB 변환
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-item"><div class="footer-dot" style="background:var(--safe)"></div>정상 <span id="cnt-safe">0</span></div>
+  <div class="footer-item"><div class="footer-dot" style="background:var(--warn)"></div>주의 <span id="cnt-warn">0</span></div>
+  <div class="footer-item"><div class="footer-dot" style="background:var(--danger)"></div>경고 <span id="cnt-danger">0</span></div>
+  <div style="margin-left:auto;color:var(--textMut)">드래그: 회전 | Shift+드래그: 이동 | 휠: 줌 | Shift+휠: 상하이동 | 마커 클릭: 상세</div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+
+// PC 폴더 구조: PC/Digital_Twin.html, output/chongdam_bridge.glb
+const GLB_PATH = './output/chongdam_bridge.glb';
+
+// 상태평가 등급별 색상
+const GRADE_COLORS = {
+  'a': 0x2196F3,  // 파란색
+  'b': 0x4CAF50,  // 초록색
+  'c': 0xFFEB3B,  // 노란색
+  'd': 0xFF9800,  // 주황색
+  'e': 0xF44336,  // 빨간색
+};
+
+let memberGrades = {};
+async function loadMemberGrades() {
+  try {
+    const res = await fetch('./output/member_grades.json');
+    memberGrades = await res.json();
+    console.log(`[OK] member_grades.json 로드 완료: ${Object.keys(memberGrades).length}개 부재`);
+  } catch(e) {
+    console.warn('[WARN] member_grades.json 로드 실패', e);
+  }
+}
+loadMemberGrades();
+
+const SENSORS = [
+  { id:'EM_P39P40_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[8,    9,  -21.5], axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P42P43_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-21.5,9,   59.8], axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P37_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[33.5, 9,  -91],   axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P45_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-47.2,9,   130],  axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'T_P40_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[2.5,  5,  -15.7], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P40_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-0.5, 5,  -8],    axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P42_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-8.5, 5,   14.5], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P42_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-11,  5,   22.2], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'Temp_P39P40_01',type:'온도계',    unit:'℃',   color:'#FFC83C', pos:[3,    6,  -17.5], axis:'t',  range:[-10,50],   noLimit:true },
+  { id:'WG_WD',         type:'풍향',      unit:'°',   color:'#50AAFF', pos:[4.1,  9,  -10.8], axis:'w',  range:[0,360], noLimit:true },
+  { id:'WG_WS_A',       type:'풍속(평균)',unit:'m/s', color:'#50AAFF', pos:[5,    9,  -13.1], axis:'w',  range:[0,30],  noLimit:true },
+  { id:'WG_WS_M',       type:'풍속(최대)',unit:'m/s', color:'#50AAFF', pos:[3.2,  9,  -8.5],  axis:'w',  range:[0,40],  noLimit:true },
+  { id:'AC_P36P37_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[35.5, 9,  -97],   axis:'z',  range:[0,200], noLimit:true },
+  { id:'AC_P37P38_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[30,   9,  -82],   axis:'z',  range:[0,200], noLimit:true },
+];
+
+let csvData = null, csvLoading = false;
+async function loadCsvData() {
+  if (csvData || csvLoading) return;
+  csvLoading = true;
+  try {
+    const res = await fetch('./sensor_data.json');
+    csvData = await res.json();
+    renderPanel();
+  } catch(e) { console.warn('[WARN] sensor_data.json 로드 실패', e); }
+  csvLoading = false;
+}
+loadCsvData();
+
+let currentPeriod = '1d';
+
+function getSensorSeries(id, period) {
+  if (csvData && csvData[period] && csvData[period][id]) return csvData[period][id];
+  const s = SENSORS.find(x => x.id === id);
+  const vals = genData(s);
+  const now = Date.now();
+  const step = period==='10m'?600000:period==='1h'?3600000:period==='1d'?86400000:period==='1mo'?2592000000:31536000000;
+  return { ts: vals.map((_,i) => now-(vals.length-1-i)*step), val: vals };
+}
+
+function currentVal(id) {
+  const s = getSensorSeries(id, '1d');
+  return s.val.length ? s.val[s.val.length-1] : 0;
+}
+
+function getStatus(sensor) {
+  if (sensor.noLimit) return 'safe';
+  const v = currentVal(sensor.id), [lo,hi] = sensor.range;
+  const warn20 = (hi-lo)*0.15;
+  if (Math.abs(v-((lo+hi)/2)) > (hi-lo)/2-warn20*0.5) return 'danger';
+  if (Math.abs(v-((lo+hi)/2)) > (hi-lo)/2-warn20)     return 'warn';
+  return 'safe';
+}
+
+function genData(sensor) {
+  const [lo,hi] = sensor.range;
+  const mid=(lo+hi)/2, span=(hi-lo)*0.35;
+  return Array.from({length:48},(_,i)=>mid+(Math.random()-.5)*span+Math.sin(i*.3)*span*.3);
+}
+
+// Three.js
+const canvas = document.getElementById('three-canvas');
+const wrap   = document.getElementById('canvas-wrap');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setClearColor(0x0D1420, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 50000);
+camera.position.set(0, 800, 1500);
+camera.lookAt(0, 0, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(100, 200, 100);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 1; dirLight.shadow.camera.far = 1000;
+dirLight.shadow.camera.left = -300; dirLight.shadow.camera.right = 300;
+dirLight.shadow.camera.top = 300; dirLight.shadow.camera.bottom = -300;
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x4488aa, 1.0);
+fillLight.position.set(-100, 50, -100);
+scene.add(fillLight);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 0.8));
+
+const seaGeo = new THREE.PlaneGeometry(2000, 2000, 80, 80);
+const seaMat = new THREE.MeshStandardMaterial({ color:0x0A3A5C, emissive:0x051828, emissiveIntensity:0.3, roughness:0.1, metalness:0.8, transparent:true, opacity:0.92 });
+const seaMesh = new THREE.Mesh(seaGeo, seaMat);
+seaMesh.rotation.x = -Math.PI/2;
+scene.add(seaMesh);
+const seaPositions = seaGeo.attributes.position;
+const seaOriginZ = new Float32Array(seaPositions.count);
+for (let i=0;i<seaPositions.count;i++) seaOriginZ[i] = seaPositions.getY(i);
+
+const bridgeGroup = new THREE.Group();
+scene.add(bridgeGroup);
+let modelLoaded = false, deckMesh = null;
+
+const loader = new THREE.GLTFLoader();
+
+loader.load(GLB_PATH,
+  function(gltf) {
+    const model = gltf.scene;
+    model.traverse(child => {
+      if (!child.isMesh) return;
+      child.castShadow = child.receiveShadow = true;
+
+      // 등급 색상 적용 (mesh 이름 = GlobalId)
+      const grade = memberGrades[child.name];
+      if (grade && GRADE_COLORS[grade]) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: GRADE_COLORS[grade],
+          emissive: GRADE_COLORS[grade],
+          emissiveIntensity: 0.4,
+          roughness: 0.6,
+          metalness: 0.1,
+        });
+      } else {
+        child.material = new THREE.MeshStandardMaterial({
+          color: 0x888888,
+          roughness: 0.7,
+          metalness: 0.0,
+        });
+      }
+
+      if (!deckMesh) deckMesh = child;
+      else {
+        const cs = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
+        const bs = new THREE.Box3().setFromObject(deckMesh).getSize(new THREE.Vector3());
+        if (cs.x > bs.x) deckMesh = child;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    console.log(`[모델] 크기: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)}`);
+    model.position.sub(center);
+    bridgeGroup.add(model);
+    panX = 0; panY = 0; panZ = 0;
+    seaMesh.position.y = -size.y/2 - 2;
+    const maxDim = Math.max(size.x, size.y, size.z);
+    radius = maxDim * 1.8;
+    camera.far = maxDim*50; camera.near = maxDim*0.0005;
+    camera.updateProjectionMatrix();
+    updateSensorScale(size);
+    document.getElementById('loading-overlay').style.display = 'none';
+    modelLoaded = true;
+  },
+  function(xhr) {
+    if (xhr.lengthComputable) {
+      const pct = Math.round(xhr.loaded/xhr.total*100);
+      document.getElementById('loading-bar').style.width = pct+'%';
+      document.getElementById('load-progress').textContent = `${pct}%  (${(xhr.loaded/1024/1024).toFixed(1)} / ${(xhr.total/1024/1024).toFixed(1)} MB)`;
+    }
+  },
+  function(error) {
+    document.getElementById('loading-overlay').innerHTML = `
+      <div style="color:#E84040;margin-bottom:8px">모델 로드 실패</div>
+      <div style="color:#5A7A99;font-size:10px">${error.message||String(error)}</div>
+      <div style="color:#5A7A99;font-size:10px;margin-top:6px">경로: ${GLB_PATH}</div>`;
+  }
+);
+
+const markerMeshes = {}, markerGroup = new THREE.Group();
+scene.add(markerGroup);
+
+// 상태별 색상
+const STATUS_COLORS = { safe: 0x30C080, warn: 0xF0A030, danger: 0xE84040 };
+const STATUS_HEX    = { safe: '#30C080', warn: '#F0A030', danger: '#E84040' };
+
+// Canvas 텍스트로 Sprite 라벨 생성
+function makeLabelSprite(text, color) {
+  const canvas2d = document.createElement('canvas');
+  canvas2d.width = 512; canvas2d.height = 128;
+  const ctx = canvas2d.getContext('2d');
+  ctx.clearRect(0, 0, 512, 128);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 36px IBM Plex Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(canvas2d);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(8, 2, 1);
+  sprite.userData.isLabel = true;
+  return sprite;
+}
+
+SENSORS.forEach(s => {
+  const status = getStatus(s);
+  const col = STATUS_COLORS[status];
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 12, 12),
+    new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.7, metalness: 0.1, roughness: 0.3 })
+  );
+  mesh.position.set(...s.pos);
+  mesh.userData.sensorId = s.id;
+  markerGroup.add(mesh);
+  markerMeshes[s.id] = mesh;
+
+  // 펄스 링
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.0, 1.3, 16),
+    new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.userData.isRing = true;
+  mesh.add(ring);
+
+  // Sprite 라벨
+  const sprite = makeLabelSprite(s.id, STATUS_HEX[status]);
+  sprite.position.set(0, 2.5, 0);
+  mesh.add(sprite);
+});
+
+function updateSensorScale(modelSize) {
+  const markerSize = Math.max(modelSize.x, modelSize.z)*0.015*0.25;
+  markerGroup.scale.setScalar(markerSize);
+  markerGroup.position.y = 0;
+}
+
+// 카메라 컨트롤
+let isDragging=false, prevX=0, prevY=0;
+let theta=-Math.PI/8, phi=Math.PI/3.5, radius=1200;
+let panX=0, panY=0, panZ=0;
+
+canvas.addEventListener('mousedown', e => { if(e.button===0){isDragging=true;prevX=e.clientX;prevY=e.clientY;} });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mouseup', ()=>{ isDragging=false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx=(e.clientX-prevX)*0.005, dy=(e.clientY-prevY)*0.005;
+  if (e.shiftKey) {
+    const panSpeed=radius*0.001;
+    const rightX=Math.cos(theta), rightZ=-Math.sin(theta);
+    panX -= dx*panSpeed*rightX*100;
+    panZ -= dx*panSpeed*rightZ*100;
+    panY += dy*panSpeed*100;
+  } else {
+    theta -= dx;
+    phi = Math.max(0.1, Math.min(Math.PI/2.1, phi+dy));
+  }
+  prevX=e.clientX; prevY=e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.shiftKey) panY -= e.deltaY*radius*0.0002;
+  else radius = Math.max(10, Math.min(5000, radius+e.deltaY*0.5));
+}, { passive:false });
+
+canvas.addEventListener('click', e => {
+  const rect=canvas.getBoundingClientRect();
+  const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+  const ray=new THREE.Raycaster();
+  ray.setFromCamera(mouse,camera);
+  const hits=ray.intersectObjects(Object.values(markerMeshes));
+  if (hits.length) openPopup(hits[0].object.userData.sensorId);
+  else closePopup();
+});
+
+function setView(v) {
+  document.querySelectorAll('.ctrl-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  if (v==='perspective') { theta=-Math.PI/8; phi=Math.PI/3.5; }
+  if (v==='top')         { theta=0; phi=Math.PI/2-0.01; }
+  if (v==='side')        { theta=Math.PI/2; phi=Math.PI/6; }
+}
+
+let deformOn=true, deformScale=50;
+function toggleDeform() {
+  deformOn=!deformOn;
+  document.getElementById('deform-toggle').textContent = deformOn?'DEFORM ON':'DEFORM OFF';
+  document.getElementById('deform-toggle').classList.toggle('active',deformOn);
+  if (!deformOn&&bridgeGroup) { bridgeGroup.position.y=0; bridgeGroup.rotation.x=0; }
+}
+function updateScale(v) {
+  deformScale=+v;
+  document.getElementById('scale-val').textContent=v;
+  document.getElementById('footer-scale').textContent=v;
+}
+
+let popupSensorId=null;
+function setPeriod(period) {
+  currentPeriod=period;
+  document.querySelectorAll('.period-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent==={'10m':'10분','1h':'1시간','1d':'일','1mo':'월','1y':'연'}[period]);
+  });
+  if (popupSensorId) drawGraphPopup(popupSensorId);
+}
+function openPopup(id) {
+  popupSensorId = id;
+  const sensor = SENSORS.find(s=>s.id===id);
+  document.getElementById('popup-title').textContent = id + ' — ' + sensor.type;
+  const popup = document.getElementById('graph-popup');
+  if (!popup.dataset.positioned) {
+    popup.style.left = '50%';
+    popup.style.top  = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+  }
+  popup.classList.add('show');
+  drawGraphPopup(id);
+  document.querySelectorAll('.sensor-card').forEach(c=>c.classList.remove('selected'));
+  const card = document.querySelector(`[data-sensor-id="${id}"]`);
+  if (card) { card.classList.add('selected'); card.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+}
+function closePopup() {
+  document.getElementById('graph-popup').classList.remove('show');
+  document.querySelectorAll('.sensor-card').forEach(c=>c.classList.remove('selected'));
+  popupSensorId = null;
+}
+
+// 팝업 드래그 이동
+(function() {
+  const popup  = document.getElementById('graph-popup');
+  const header = document.querySelector('.popup-header');
+  let dragging = false, startX, startY, origLeft, origTop;
+
+  header.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('popup-close')) return;
+    dragging = true;
+    const rect = popup.getBoundingClientRect();
+    const wrapRect = document.getElementById('canvas-wrap').getBoundingClientRect();
+    popup.style.left = (rect.left - wrapRect.left) + 'px';
+    popup.style.top  = (rect.top  - wrapRect.top)  + 'px';
+    popup.style.transform = 'none';
+    popup.dataset.positioned = 'true';
+    startX   = e.clientX;
+    startY   = e.clientY;
+    origLeft = parseFloat(popup.style.left);
+    origTop  = parseFloat(popup.style.top);
+    popup.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    popup.style.left = (origLeft + e.clientX - startX) + 'px';
+    popup.style.top  = (origTop  + e.clientY - startY) + 'px';
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    popup.classList.remove('dragging');
+  });
+})();
+function drawGraphPopup(id) {
+  const sensor=SENSORS.find(s=>s.id===id);
+  const series=getSensorSeries(id,currentPeriod);
+  const data=series.val, ts=series.ts;
+  if (!data.length) return;
+  const cur=data[data.length-1], mx=Math.max(...data), avg=data.reduce((a,b)=>a+b,0)/data.length;
+  document.getElementById('stat-cur').textContent=cur.toFixed(2)+' '+sensor.unit;
+  document.getElementById('stat-max').textContent=mx.toFixed(2)+' '+sensor.unit;
+  document.getElementById('stat-avg').textContent=avg.toFixed(2)+' '+sensor.unit;
+  const gc=document.getElementById('graph-canvas'), ctx=gc.getContext('2d');
+  gc.width=gc.offsetWidth||440; gc.height=180;
+  const W=gc.width,H=gc.height,pad=40;
+  ctx.clearRect(0,0,W,H);
+  const mn=Math.min(...data),rng=mx-mn||1;
+  const toX=i=>pad+(W-pad*2)*i/(data.length-1);
+  const toY=v=>H-pad-(H-pad*2)*(v-mn)/rng;
+  ctx.strokeStyle='#1A2640'; ctx.lineWidth=0.5;
+  for(let i=0;i<5;i++){const y=pad+(H-pad*2)*i/4;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();ctx.fillStyle='#5A7A99';ctx.font='9px IBM Plex Mono';ctx.fillText((mn+rng*(1-i/4)).toFixed(1),2,y+3);}
+  ctx.setLineDash([4,3]); ctx.strokeStyle='#E84040'; ctx.lineWidth=0.8;
+  if(sensor.range[1]>=mn&&sensor.range[1]<=mx){ctx.beginPath();ctx.moveTo(pad,toY(sensor.range[1]));ctx.lineTo(W-pad,toY(sensor.range[1]));ctx.stroke();}
+  ctx.setLineDash([]);
+  const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,sensor.color+'50');grad.addColorStop(1,sensor.color+'05');
+  ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((_,i)=>{if(i>0)ctx.lineTo(toX(i),toY(data[i]));});ctx.lineTo(toX(data.length-1),H-pad);ctx.lineTo(toX(0),H-pad);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((_,i)=>{if(i>0)ctx.lineTo(toX(i),toY(data[i]));});ctx.strokeStyle=sensor.color;ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.arc(toX(data.length-1),toY(data[data.length-1]),4,0,Math.PI*2);ctx.fillStyle=sensor.color;ctx.fill();
+  ctx.fillStyle='#5A7A99'; ctx.font='9px IBM Plex Mono';
+  if(ts.length){
+    const fmt=ms=>{const d=new Date(ms);if(currentPeriod==='10m'||currentPeriod==='1h')return d.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});if(currentPeriod==='1d'||currentPeriod==='1mo')return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'});return d.getFullYear()+'년';};
+    ctx.fillText(fmt(ts[0]),pad-4,H-6);
+    ctx.fillText(fmt(ts[ts.length-1]),toX(data.length-1)-20,H-6);
+  }
+}
+
+const typeGroups = {
+  '신축변위계':SENSORS.filter(s=>s.type==='신축변위계'),
+  '경사계':    SENSORS.filter(s=>s.type==='경사계'),
+  '온도계':    SENSORS.filter(s=>s.type==='온도계'),
+  '풍향풍속':  SENSORS.filter(s=>s.id.startsWith('WG_')),
+  '가속도계':  SENSORS.filter(s=>s.type==='가속도계'),
+};
+
+function renderPanel() {
+  const cont=document.getElementById('tab-sensors');
+  cont.innerHTML='';
+  let safe=0,warn=0,danger=0;
+  Object.entries(typeGroups).forEach(([name,sensors])=>{
+    const title=document.createElement('div');title.className='sensor-section-title';title.textContent=name;cont.appendChild(title);
+    sensors.forEach(s=>{
+      const val=currentVal(s.id),status=getStatus(s);
+      if(status==='safe')safe++;else if(status==='warn')warn++;else danger++;
+      const card=document.createElement('div');card.className='sensor-card';card.style.setProperty('--card-color',s.color);card.dataset.sensorId=s.id;
+      const statusLabel=status==='safe'?'정상':status==='warn'?'주의':'경고';
+      const bars=(()=>{const series=getSensorSeries(s.id,'1d');const slice=series.val.slice(-12);if(!slice.length)return'';return slice.map(v=>{const pct=Math.max(3,((v-s.range[0])/(s.range[1]-s.range[0]))*100);return`<div class="mini-bar" style="height:${pct}%;background:${s.color}40;border-top:1px solid ${s.color}80"></div>`;}).join('');})();
+      card.innerHTML=`<div class="sc-top"><span class="sc-id">${s.id}</span><span class="sc-status ${status}">${statusLabel}</span></div><div><span class="sc-val">${val.toFixed(2)}</span><span class="sc-unit">${s.unit}</span></div><div class="sc-type">${s.type}</div><div class="mini-chart">${bars}</div>`;
+      card.onclick=()=>openPopup(s.id);cont.appendChild(card);
+    });
+  });
+  document.getElementById('cnt-safe').textContent=safe;
+  document.getElementById('cnt-warn').textContent=warn;
+  document.getElementById('cnt-danger').textContent=danger;
+}
+
+function switchTab(el,tab) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  document.getElementById('tab-sensors').style.display=tab==='sensors'?'block':'none';
+  document.getElementById('tab-info').style.display=tab==='info'?'block':'none';
+}
+
+setInterval(()=>{document.getElementById('time-display').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});},1000);
+document.getElementById('time-display').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});
+setInterval(()=>{ if(popupSensorId)drawGraphPopup(popupSensorId); },60000);
+
+let t=0;
+function animate() {
+  requestAnimationFrame(animate);
+  t+=0.016;
+  const tx=panX,ty=panY,tz=panZ;
+  camera.position.x=tx+Math.sin(theta)*Math.cos(phi)*radius;
+  camera.position.y=ty+Math.sin(phi)*radius;
+  camera.position.z=tz+Math.cos(theta)*Math.cos(phi)*radius;
+  camera.lookAt(tx,ty,tz);
+  for(let i=0;i<seaPositions.count;i++){const x=seaPositions.getX(i),z=seaPositions.getZ(i);seaPositions.setY(i,seaOriginZ[i]+Math.sin(x*0.015+t*0.6)*0.8+Math.sin(z*0.01+t*0.4)*0.6);}
+  seaPositions.needsUpdate=true; seaGeo.computeVertexNormals();
+  if(deformOn&&modelLoaded){const em=currentVal('EM_P39P40_01'),deform=(em/1000)*deformScale;bridgeGroup.position.y=deform*0.3*Math.sin(t*0.5);bridgeGroup.rotation.x=deform*0.005*Math.cos(t*0.4);}
+  markerGroup.children.forEach(m=>{
+    if(m.userData.isRing){m.scale.setScalar(1+Math.sin(t*2+m.position.x*0.1)*0.2);m.material.opacity=0.2+Math.sin(t*2+m.position.x*0.1)*0.15;}
+    else if(m.userData.sensorId){
+      const sensor=SENSORS.find(s=>s.id===m.userData.sensorId);
+      if(sensor){
+        const status=getStatus(sensor);
+        const col=STATUS_COLORS[status];
+        m.material.color.setHex(col);
+        m.material.emissive.setHex(col);
+        m.material.emissiveIntensity=0.5+Math.sin(t*3+m.position.x*0.1)*0.3;
+        m.children.forEach(child => {
+          if(child.userData.isRing) child.material.color.setHex(col);
+          if(child.userData.isLabel) {
+            const scale = Math.max(0.3, Math.min(1.0, 800 / radius));
+            child.scale.set(8 * scale, 2 * scale, 1);
+            child.material.opacity = radius > 600 ? Math.max(0, 1 - (radius - 600) / 400) : 1;
+          }
+        });
+      }
+    }
+  });
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  if(renderer.domElement.width!==W||renderer.domElement.height!==H){
+    renderer.setSize(W,H,false);
+    camera.aspect=W/H;camera.updateProjectionMatrix();
+  }
+  renderer.render(scene,camera);
+}
+
+renderer.setSize(wrap.clientWidth,wrap.clientHeight,false);
+camera.aspect=wrap.clientWidth/wrap.clientHeight;
+camera.updateProjectionMatrix();
+renderPanel();
+animate();
+
+window.moveMarker=(id,x,y,z)=>{const m=markerMeshes[id];if(m){m.position.set(x,y,z);console.log(`${id} → (${x},${y},${z})`);} };
+window.listMarkers=()=>SENSORS.forEach(s=>{const m=markerMeshes[s.id];if(m)console.log(`${s.id}: ${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}`);});
+window.showAllMarkers=()=>SENSORS.forEach(s=>{const m=markerMeshes[s.id];if(m)console.log(`{ id:'${s.id}', pos:[${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}] },`);});
+
+</script>
+</body>
+</html>
