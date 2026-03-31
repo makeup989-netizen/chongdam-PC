@@ -345,6 +345,73 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
+/*
+================================================================================
+  청담대교 Digital Twin — 센서 모니터링
+  파일: Digital_Twin.html  (단일 파일, 외부 의존: Three.js r128 + GLTFLoader)
+================================================================================
+
+【프로젝트 개요】
+  - 청담대교 Revit BIM 모델(GLB)을 Three.js로 렌더링
+  - 14개 계측 센서(신축변위계·경사계·온도계·풍향풍속·가속도계) 실시간 시각화
+  - 서울 한강 도시 배경(강·둔치·공원·도로·빌딩) 자동 생성
+
+【주요 전역 변수 / 구조】
+  ┌─ scene                  Three.js 씬 루트
+  │   ├─ envGroup           배경 전체 그룹 (강·둔치·도로·빌딩 포함)
+  │   │   ├─ seaMesh        한강 수면 (PlaneGeometry, 파도 애니메이션)
+  │   │   ├─ groundMesh     바닥 지면
+  │   │   ├─ layerMeshes[]  강변 둔치·공원·도로 (강 폭 변경 시 자동 이동)
+  │   │   ├─ buildingGroupN 북쪽 도시 빌딩 그룹 (+z 방향)
+  │   │   └─ buildingGroupS 남쪽 도시 빌딩 그룹 (-z 방향)
+  │   ├─ bridgeGroup        청담대교 GLB 모델
+  │   └─ markerGroup        센서 마커 구체 + 라벨 스프라이트
+  │
+  ├─ RIVER_W = 8000         강 길이 (지면과 동일, X축 방향)
+  ├─ RIVER_L = 550          강 폭 초기값 (Z축 방향, rebuildSeaGeo()로 변경)
+  │
+  └─ envGroup.rotation.y    배경 Y축 회전 (기본 160.1°, setEnvRot()로 변경)
+
+【강변 레이어 구조 (Z축 기준, 강 폭 변경 시 자동 이동)】
+  강(RIVER_L/2) → 둔치(+20) → 공원(+70) → 도로(+125) → 빌딩(+145~)
+
+【빌딩 생성 방식】
+  - fillCityRandom()으로 x:±4000, z:0~3500 범위에 랜덤 간격(5~120) 배치
+  - 5가지 타입: 기본타워·포디엄타워·계단식·쌍둥이타워·상업블록
+  - 높이 분포: 저층 50% / 중층 30% / 고층 20%
+
+【콘솔 API (F12 → Console에서 사용)】
+  배경 제어:
+    setEnvRot(160.1)       배경 Y축 회전 (도)
+    rotEnv(5)              현재에서 +5도 추가 회전
+    setEnvPos(x,y,z)       배경 위치 이동
+    setEnvScale(1.2)       배경 전체 스케일
+  강 제어:
+    setRiverWidth(550)     강 폭 변경 (둔치·도로·빌딩 자동 이동)
+    setSeaY(-3)            강 수면 Y 위치
+  빌딩 제어:
+    setBuildingScale(1.5)       빌딩 전체 배율
+    setBuildingScaleXYZ(1,2,1)  축별 배율
+  모델 제어:
+    setModelPos(x,y,z)     다리 모델 절대 위치 (호출 시 DEFORM 자동 OFF)
+    moveModel(dx,dy,dz)    다리 모델 상대 이동
+    setModelRot(x,y,z)     다리 모델 회전 (도)
+    modelInfo()            현재 모델 위치·회전 출력
+  센서 마커:
+    listMarkers()          마커 위치 목록
+    moveMarker(id,x,y,z)   마커 이동
+  상태 확인:
+    envInfo()              배경 현재 값 출력
+    help()                 전체 명령어 목록
+
+【주의사항】
+  - DEFORM ON 상태에서는 bridgeGroup.position.y가 매 프레임 덮어써짐
+    → setModelPos/moveModel 호출 시 자동으로 DEFORM OFF 전환
+  - rebuildSeaGeo(width): 강 폭 변경 + 파도 geometry 재생성 + 레이아웃 재계산
+  - envGroup 회전(160.1°) 기준으로 강이 화면에서 대각선으로 보임
+    (모델 GLB의 주축이 Z축이므로 배경을 160.1도 회전해서 맞춤)
+================================================================================
+*/
 
 const GLB_PATH = 'https://media.githubusercontent.com/media/makeup989-netizen/chongdam-pc/master/output/chongdam_bridge.glb';
 
@@ -669,57 +736,55 @@ function seededRand(seed) {
   return x - Math.floor(x);
 }
 
-// ── 격자 기반 촘촘한 도시 배치 (서울 스타일) ──
+// ── 랜덤 간격 도시 배치 (간격 0~120 랜덤) ──
 function seededRand(seed) {
   const x = Math.sin(seed) * 43758.5453123;
   return x - Math.floor(x);
 }
 
-// 격자 간격: x방향 45, z방향 45 (블록 크기 + 도로 여백)
-// x: -4000~4000, z: 0~3500 (로컬 기준)
-const GRID_X = 100, GRID_Z = 100;
-
-function fillCityGrid(group, sign, seedBase) {
+function fillCityRandom(group, sign, seedBase) {
   const xStart = -4000, xEnd = 4000;
   const zStart = 0,     zEnd = 3500;
+  const MIN_GAP = 5, MAX_GAP = 120;
 
   let si = 0;
-  for (let gx = xStart; gx < xEnd; gx += GRID_X) {
-    for (let gz = zStart; gz < zEnd; gz += GRID_Z) {
+  let curX = xStart;
+  while (curX < xEnd) {
+    let curZ = zStart;
+    while (curZ < zEnd) {
       const s = seedBase + si++;
-      // 블록 내 약간의 랜덤 오프셋 (딱딱한 격자 느낌 완화)
-      const ox = (seededRand(s*3+1) - 0.5) * 10;
-      const oz = (seededRand(s*3+2) - 0.5) * 10;
-      const x  = gx + GRID_X/2 + ox;
-      const z  = (gz + GRID_Z/2 + oz) * sign;
-
-      const w  = 18 + seededRand(s*3+3) * 22;   // 18~40
-      const d  = 18 + seededRand(s*3+4) * 20;   // 18~38
-      const h  = 15 + seededRand(s*3+5) * 140;  // 15~155 (저층~초고층 혼재)
-
-      // 서울 스타일 높이 분포: 낮은 건물 많고 간간이 고층
+      const w = 18 + seededRand(s*3+3) * 22;
+      const d = 18 + seededRand(s*3+4) * 20;
+      const h = 15 + seededRand(s*3+5) * 140;
       const heightRoll = seededRand(s*3+6);
-      const finalH = heightRoll < 0.5 ? h * 0.3   // 50%: 저층 (4~47)
-                   : heightRoll < 0.8 ? h * 0.6   // 30%: 중층
-                   :                    h;          // 20%: 고층
-
+      const finalH = heightRoll < 0.5 ? h * 0.3
+                   : heightRoll < 0.8 ? h * 0.6
+                   :                    h;
       const typeIdx = Math.floor(seededRand(s*3+7) * 5);
-
-      // 색상: 서울 콘크리트 도시 톤 (회색~베이지~청회)
       const brightness = 0.38 + seededRand(s*3+8) * 0.22;
       const hue = seededRand(s*3+9);
-      const r = brightness + hue * 0.05;
+      const r  = brightness + hue * 0.05;
       const gg = brightness + hue * 0.02;
       const b  = brightness + hue * 0.07;
 
+      const x = curX + w / 2;
+      const z = (curZ + d / 2) * sign;
       spawnBuilding(group, x, z, w, finalH, d,
         new THREE.Color(r, gg, b).getHex(), typeIdx);
+
+      // z 다음 위치: 건물 깊이 + 랜덤 간격
+      const gapZ = MIN_GAP + seededRand(s*3+10) * (MAX_GAP - MIN_GAP);
+      curZ += d + gapZ;
     }
+    // x 다음 위치: 건물 폭 + 랜덤 간격
+    const sRow = seedBase + si++;
+    const gapX = MIN_GAP + seededRand(sRow * 7 + 1) * (MAX_GAP - MIN_GAP);
+    curX += (18 + seededRand(sRow * 7 + 2) * 22) + gapX;
   }
 }
 
-fillCityGrid(buildingGroupN, +1,    0);  // 북쪽
-fillCityGrid(buildingGroupS, -1, 9999);  // 남쪽
+fillCityRandom(buildingGroupN, +1,    0);
+fillCityRandom(buildingGroupS, -1, 99999);
 
 
 
