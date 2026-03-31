@@ -480,14 +480,13 @@ scene.fog = new THREE.Fog(0xC8E8FF, 3000, 10000);
   scene.add(new THREE.Mesh(skyGeo, skyMat));
 })();
 
-// ── 한강 수면 (맑은 낮 - 반투명 파란 물) ──
-// 모델 크기 기준: X=296m, Z=750m → 한강 폭 약 400m
-const RIVER_W = 3000, RIVER_L = 600;
-const seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 40);
+// ── 한강 수면 (모델 Z=750m 기준 폭 300m) ──
+const RIVER_W = 3000, RIVER_L = 300;
+const seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
 const seaMat = new THREE.MeshStandardMaterial({
   color: 0x1A7AAA, emissive: 0x0A3A55, emissiveIntensity: 0.1,
   roughness: 0.1, metalness: 0.7,
-  transparent: true, opacity: 0.82,
+  transparent: true, opacity: 0.85,
 });
 const seaMesh = new THREE.Mesh(seaGeo, seaMat);
 seaMesh.rotation.x = -Math.PI / 2;
@@ -498,49 +497,29 @@ for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i
 
 // ── 지면 (전체 배경 땅) ──
 const groundGeo = new THREE.PlaneGeometry(8000, 8000, 1, 1);
-const groundMat = new THREE.MeshStandardMaterial({ color: 0x3A5A2A, roughness: 0.95, metalness: 0.0 });
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x4A6A3A, roughness: 0.95, metalness: 0.0 });
 const groundMesh = new THREE.Mesh(groundGeo, groundMat);
 groundMesh.rotation.x = -Math.PI / 2;
-groundMesh.position.y = -1;
+groundMesh.position.y = -2;
 scene.add(groundMesh);
 
-// ── 강변 (콘크리트 둔치) ──
-function makeBankMesh(w, l, x, z, color) {
+// ── 강변 둔치 + 도로 (한강 바로 옆) ──
+function makePlane(w, l, x, z, y, color) {
   const geo = new THREE.PlaneGeometry(w, l, 1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.0 });
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.0 });
   const m = new THREE.Mesh(geo, mat);
   m.rotation.x = -Math.PI / 2;
-  m.position.set(x, 0.2, z);
+  m.position.set(x, y, z);
   scene.add(m);
 }
-// 북쪽 강변 (청담동)
-makeBankMesh(3000, 200, 0, -380, 0x5A7A4A);  // 공원 녹지
-makeBankMesh(3000,  60, 0, -440, 0x888888);   // 콘크리트 둔치
-// 남쪽 강변 (뚝섬)
-makeBankMesh(3000, 200, 0,  380, 0x5A7A4A);
-makeBankMesh(3000,  60, 0,  440, 0x888888);
-
-// ── 올림픽대로 / 강변북로 ──
-function makeRoad(w, l, x, z) {
-  const geo = new THREE.PlaneGeometry(w, l, 1, 1);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x333A3A, roughness: 0.95, metalness: 0.0 });
-  const m = new THREE.Mesh(geo, mat);
-  m.rotation.x = -Math.PI / 2;
-  m.position.set(x, 0.5, z);
-  scene.add(m);
-  // 차선 표시
-  for (let i = -6; i <= 6; i++) {
-    const lGeo = new THREE.PlaneGeometry(60, 1.5);
-    const lMat = new THREE.MeshBasicMaterial({ color: 0xFFFFAA, transparent: true, opacity: 0.7 });
-    const line = new THREE.Mesh(lGeo, lMat);
-    line.rotation.x = -Math.PI / 2;
-    line.rotation.z = Math.PI / 2;
-    line.position.set(i * 120, 1, z);
-    scene.add(line);
-  }
-}
-makeRoad(3000, 40, 0, -490);   // 강변북로
-makeRoad(3000, 40, 0,  490);   // 올림픽대로
+// 북쪽 (z 음수): 한강(0) → 둔치 → 공원 → 도로
+makePlane(3000, 40,  0, -170, 0.3, 0x999999);  // 콘크리트 둔치
+makePlane(3000, 80,  0, -220, 0.2, 0x5A8A3A);  // 강변 공원
+makePlane(3000, 30,  0, -270, 0.5, 0x333A3A);  // 강변북로
+// 남쪽 (z 양수)
+makePlane(3000, 40,  0,  170, 0.3, 0x999999);
+makePlane(3000, 80,  0,  220, 0.2, 0x5A8A3A);
+makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
 
 // ── 태양 ──
 (function addSun() {
@@ -602,71 +581,62 @@ function makeBuilding(x, z, w, h, d, color) {
   scene.add(win);
 }
 
-// ── 강남 빌딩군 (남쪽, 3열) ──
+// ── 강남 빌딩군 (남쪽 - 도로 뒤, 300~700m) ──
 const buildingsS = [
-  // 1열 (600~750m)
-  [-600,660,55,220,50],[-480,680,45,310,45],[-340,650,60,180,55],[-200,670,50,260,50],
-  [-60,660,65,200,55],[80,675,45,290,45],[220,655,55,240,50],[360,670,50,320,50],
-  [500,660,45,210,45],[640,680,55,270,50],[-700,670,40,170,40],[750,665,40,190,40],
-  // 2열 (800~950m)
-  [-550,860,40,160,40],[-410,845,50,140,45],[-270,865,45,200,45],[-130,850,40,170,40],
-  [10,860,55,150,50],[160,845,45,190,45],[310,865,40,160,40],[460,850,50,180,50],
-  [610,860,40,155,40],[-680,850,35,130,35],[720,855,35,145,35],
-  // 3열 (1050~1200m - 산 앞 저층)
-  [-520,1080,35,100,35],[-350,1060,40,120,40],[-180,1075,35,110,35],
-  [0,1065,40,130,40],[180,1080,35,100,35],[360,1060,40,115,40],[540,1075,35,105,35],
+  // 1열 (310~420m) - 낮은 빌딩
+  [-500,340,18,45,18],[-390,325,22,60,20],[-270,345,20,38,18],[-150,330,25,55,22],
+  [-30,340,18,48,18],[90,328,22,65,20],[210,342,20,42,18],[330,330,24,58,22],
+  [450,340,18,50,18],[570,328,20,44,18],[-620,335,16,36,16],[690,340,16,40,16],
+  // 2열 (450~560m) - 중층
+  [-480,490,20,70,20],[-350,475,24,85,22],[-220,490,22,58,20],[-90,478,26,75,24],
+  [40,490,20,62,20],[170,476,24,80,22],[300,490,22,68,20],[430,478,20,72,20],
+  [560,490,18,55,18],[-600,482,16,50,16],[680,488,16,52,16],
+  // 3열 (600~700m) - 고층
+  [-520,640,22,90,20],[-380,625,26,110,24],[-240,640,24,78,22],[-100,628,28,95,26],
+  [40,640,22,85,20],[180,626,26,105,24],[320,640,24,88,22],[460,628,22,92,20],
+  [600,640,20,75,20],[-660,632,18,65,18],[720,638,18,70,18],
 ];
 buildingsS.forEach(([x,z,w,h,d]) => {
-  const r = 0.38+Math.random()*0.12, g = r+0.02, b = r+0.06;
+  const r = 0.52+Math.random()*0.15, g = r+0.02, b = r+0.06;
   makeBuilding(x,z,w,h,d,new THREE.Color(r,g,b).getHex());
 });
 
-// ── 강북 빌딩군 (북쪽, 3열) ──
+// ── 강북 빌딩군 (북쪽 - 도로 뒤, 300~700m) ──
 const buildingsN = [
-  // 1열
-  [-600,-660,50,190,45],[-470,-680,55,250,50],[-330,-655,45,210,45],[-190,-670,60,230,55],
-  [-50,-660,50,280,50],[90,-675,45,200,45],[230,-655,55,260,50],[370,-670,50,220,50],
-  [510,-660,45,240,45],[650,-680,55,190,50],[-720,-670,40,160,40],[760,-665,40,180,40],
-  // 2열
-  [-540,-850,45,150,40],[-390,-845,40,180,45],[-240,-860,50,160,45],[-90,-850,45,200,40],
-  [60,-860,40,170,50],[210,-845,50,155,45],[360,-860,45,185,40],[510,-850,40,170,50],
-  [660,-860,40,150,40],[-670,-850,35,125,35],[730,-855,35,140,35],
-  // 3열
-  [-510,-1070,35,105,35],[-340,-1055,40,125,40],[-170,-1070,35,115,35],
-  [10,-1060,40,135,40],[190,-1075,35,105,35],[370,-1055,40,120,40],[550,-1070,35,110,35],
+  [-500,-330,18,42,18],[-380,-320,22,58,20],[-250,-335,20,35,18],[-120,-325,25,52,22],
+  [10,-335,18,45,18],[130,-322,22,62,20],[250,-338,20,40,18],[380,-326,24,55,22],
+  [510,-335,18,47,18],[640,-322,20,42,18],[-630,-328,16,34,16],[760,-334,16,38,16],
+  [-460,-475,20,65,20],[-320,-462,24,82,22],[-180,-478,22,55,20],[-40,-466,26,72,24],
+  [100,-478,20,60,20],[240,-464,24,78,22],[380,-478,22,65,20],[520,-466,20,70,20],
+  [660,-478,18,52,18],[-590,-470,16,48,16],[780,-476,16,50,16],
+  [-500,-618,22,88,20],[-355,-605,26,108,24],[-210,-620,24,75,22],[-65,-608,28,92,26],
+  [80,-620,22,82,20],[225,-606,26,102,24],[370,-620,24,85,22],[515,-608,22,90,20],
+  [660,-620,20,72,20],[-640,-612,18,62,18],[780,-618,18,68,18],
 ];
 buildingsN.forEach(([x,z,w,h,d]) => {
-  const r = 0.36+Math.random()*0.12, g = r+0.01, b = r+0.04;
+  const r = 0.50+Math.random()*0.15, g = r+0.01, b = r+0.04;
   makeBuilding(x,z,w,h,d,new THREE.Color(r,g,b).getHex());
 });
 
-// ── 산 (빌딩 뒤 배경) ──
-// Three.js PlaneGeometry를 높이맵으로 변형해서 산 능선 표현
+// ── 산 능선 (빌딩 뒤) ──
 (function addMountains() {
   function makeMountainRange(zPos, peaks, color, opacity=1.0) {
-    const W = 6000, segs = 80;
-    const geo = new THREE.PlaneGeometry(W, 800, segs, 10);
+    const segs = 100;
+    const geo = new THREE.PlaneGeometry(5000, 600, segs, 12);
     const pos = geo.attributes.position;
-
-    // 각 꼭짓점 높이를 산 모양으로 설정
-    for (let i = 0; i <= segs; i++) {
-      for (let j = 0; j <= 10; j++) {
+    for (let j = 0; j <= 12; j++) {
+      for (let i = 0; i <= segs; i++) {
         const idx = j * (segs+1) + i;
         const x = pos.getX(idx);
-        const v = pos.getY(idx);  // PlaneGeometry에서 Y가 앞뒤 축
-
-        // 여러 산봉우리 합산
         let h = 0;
         peaks.forEach(([px, ph, pw]) => {
           h += ph * Math.exp(-Math.pow((x - px) / pw, 2));
         });
-        // 앞쪽(v 작을수록)은 낮게, 뒤쪽은 높게
-        h *= (j / 10) * 0.9 + 0.1;
+        h *= (j / 12) * 0.85 + 0.15;
         pos.setZ(idx, h);
       }
     }
     geo.computeVertexNormals();
-
     const mat = new THREE.MeshStandardMaterial({
       color, roughness: 0.95, metalness: 0.0,
       transparent: opacity < 1.0, opacity,
@@ -677,37 +647,15 @@ buildingsN.forEach(([x,z,w,h,d]) => {
     scene.add(m);
   }
 
-  // 강남 뒤 산 (남쪽, z 양수)
-  // 앞산 (초록, 1300m)
-  makeMountainRange(1350, [
-    [-1800, 280, 500], [-900, 350, 400], [-200, 420, 450],
-    [ 400, 380, 420], [1100, 320, 380], [1900, 260, 500],
-  ], 0x3A6A2A);
-  // 뒷산 (연한 초록, 1800m)
-  makeMountainRange(1850, [
-    [-2000, 400, 600], [-800, 500, 500], [ 100, 560, 520],
-    [ 900, 480, 480], [1600, 440, 550], [2200, 380, 500],
-    [-1400, 460, 450],
-  ], 0x4A7A38);
-  // 원경 산 (안개색, 2400m)
-  makeMountainRange(2500, [
-    [-2200, 520, 700], [-600, 620, 600], [ 400, 680, 650],
-    [1200, 580, 580], [2000, 540, 620],
-  ], 0x7AAA88, 0.7);
+  // 강남 뒤 (남쪽)
+  makeMountainRange(820,  [[-1500,80,400],[-700,110,350],[0,130,380],[600,115,340],[1400,90,400]], 0x4A7A3A);
+  makeMountainRange(1100, [[-1600,140,500],[-500,180,450],[200,200,480],[900,165,420],[1700,145,480]], 0x3A6A2A);
+  makeMountainRange(1500, [[-1800,200,600],[-400,250,550],[300,280,580],[1100,230,520],[2000,190,580]], 0x8AAA78, 0.75);
 
-  // 강북 뒤 산 (북쪽, z 음수)
-  makeMountainRange(-1350, [
-    [-1800, 260, 500], [-900, 330, 400], [-100, 400, 440],
-    [ 500, 360, 420], [1200, 300, 380], [1900, 250, 500],
-  ], 0x3A6A2A);
-  makeMountainRange(-1850, [
-    [-2000, 380, 600], [-700, 480, 500], [ 200, 540, 520],
-    [1000, 460, 480], [1700, 420, 550],
-  ], 0x4A7A38);
-  makeMountainRange(-2500, [
-    [-2200, 500, 700], [-500, 600, 600], [ 500, 660, 650],
-    [1300, 560, 580], [2100, 520, 620],
-  ], 0x7AAA88, 0.7);
+  // 강북 뒤 (북쪽)
+  makeMountainRange(-800,  [[-1500,75,400],[-600,105,350],[100,125,370],[700,110,340],[1500,85,400]], 0x4A7A3A);
+  makeMountainRange(-1080, [[-1600,135,500],[-400,175,450],[300,195,470],[1000,160,420],[1800,140,470]], 0x3A6A2A);
+  makeMountainRange(-1480, [[-1800,195,600],[-300,245,550],[400,275,570],[1200,225,520],[2100,185,570]], 0x8AAA78, 0.75);
 })();
 // ══════════════════════════════════════════════
 
