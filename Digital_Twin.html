@@ -499,7 +499,7 @@ let seaPositions = seaGeo.attributes.position;
 let seaOriginZ = new Float32Array(seaPositions.count);
 for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i);
 
-// 강 폭 재생성 함수 (animate 루프가 seaPositions/seaOriginZ를 참조하므로 함께 교체)
+// 강 폭 재생성 + 레이아웃 업데이트 (한 번에)
 function rebuildSeaGeo(newWidth) {
   RIVER_L = newWidth;
   seaGeo.dispose();
@@ -508,6 +508,7 @@ function rebuildSeaGeo(newWidth) {
   seaPositions = seaGeo.attributes.position;
   seaOriginZ = new Float32Array(seaPositions.count);
   for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i);
+  updateRiverLayout();
 }
 
 // ── 지면 ──
@@ -554,21 +555,17 @@ envGroup.add(buildingGroupN);
 envGroup.add(buildingGroupS);
 
 // 강 폭 변경 시 레이어 + 빌딩 그룹 위치를 재계산
+// 레이어 구조: 둔치(dz=20, 폭40) → 공원(dz=70, 폭80) → 도로(dz=125, 폭30)
+// 도로 바깥 끝 = half + 125 + 15(폭/2) = half + 140
+// 빌딩은 도로 끝에서 시작 → 기준점 half + 145
 function updateRiverLayout() {
   const half = RIVER_L / 2;
   layerMeshes.forEach(({ mesh, dz, sign }) => {
     mesh.position.z = sign * (half + dz);
   });
-  // 빌딩 그룹은 강 끝(half) + 140 지점을 기준점으로 이동
-  buildingGroupN.position.z =  half + 140;
-  buildingGroupS.position.z = -(half + 140);
-}
-
-// rebuildSeaGeo 후 layout 업데이트도 같이
-const _origRebuild = rebuildSeaGeo;
-function rebuildSeaGeo(newWidth) {
-  _origRebuild(newWidth);
-  updateRiverLayout();
+  // 빌딩 기준점 = 도로 바깥 끝(half+140) + 여유 5
+  buildingGroupN.position.z =  half + 145;
+  buildingGroupS.position.z = -(half + 145);
 }
 
 // ── 태양 ──
@@ -625,13 +622,9 @@ const glassMat = new THREE.MeshStandardMaterial({
   metalness: 0.95, roughness: 0.04,
 });
 
-// ── 빌딩 생성 함수 (타입 랜덤 선택) ──
-const buildingTypes = [makeBoxTower, makePodiumTower, makeSetbackTower, makeTwinTower, makeCommercial];
+// ── 빌딩 생성 함수 ──
 function spawnBuilding(group, x, z, w, h, d, colorHex, typeHint) {
-  const type = typeHint !== undefined ? typeHint : Math.floor(Math.random() * buildingTypes.length);
-  // 빌딩 생성 함수들이 buildingGroup에 add하므로 임시로 교체
-  const prev = buildingGroup;
-  // 각 타입 함수는 내부에서 buildingGroup.add() → 아래에서 직접 group 전달
+  const type = typeHint !== undefined ? typeHint : Math.floor(Math.random() * 5);
   _spawnToGroup(group, x, z, w, h, d, colorHex, type);
 }
 
@@ -1152,39 +1145,8 @@ window.rotEnv = (delta) => {
   console.log(`[envGroup] 회전 → ${envRotationDeg}°`);
 };
 
-// ── 모델 위치 ──
-// setModelPos(x, y, z)  예) setModelPos(10, 0, -5)
-window.setModelPos = (x, y, z) => {
-  bridgeGroup.position.set(parseFloat(x), parseFloat(y), parseFloat(z));
-  console.log(`[bridgeGroup] position → (${x}, ${y}, ${z})`);
-};
-window.setBridgePos = window.setModelPos; // 별칭
-// moveModel(dx, dy, dz)  현재 위치에서 상대 이동
-window.moveModel = (dx, dy, dz) => {
-  bridgeGroup.position.x += parseFloat(dx||0);
-  bridgeGroup.position.y += parseFloat(dy||0);
-  bridgeGroup.position.z += parseFloat(dz||0);
-  const p = bridgeGroup.position;
-  console.log(`[bridgeGroup] position → (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
-};
-window.moveBridge = window.moveModel; // 별칭
-// setModelRot(x, y, z)  회전 (도 단위)
-window.setModelRot = (x, y, z) => {
-  bridgeGroup.rotation.set(
-    THREE.MathUtils.degToRad(parseFloat(x||0)),
-    THREE.MathUtils.degToRad(parseFloat(y||0)),
-    THREE.MathUtils.degToRad(parseFloat(z||0))
-  );
-  console.log(`[bridgeGroup] rotation → (${x}°, ${y}°, ${z}°)`);
-};
-// modelInfo()  현재 모델 위치/회전 확인
-window.modelInfo = () => {
-  const p = bridgeGroup.position, r = bridgeGroup.rotation;
-  console.log(`[bridgeGroup]
-  position : (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})
-  rotation : (${THREE.MathUtils.radToDeg(r.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.z).toFixed(1)}°)`);
-};
-window.bridgeInfo = window.modelInfo; // 별칭
+// ── 강 수위 ──
+window.setSeaY = (y) => {
   updateSeaY(y);
   console.log(`[seaMesh] position.y → ${y}`);
 };
