@@ -614,7 +614,7 @@ function updateRiverLayout() {
 const buildingGroup = buildingGroupN; // 하위 호환용 (setBuildingScale에서 사용)
 
 // 초기 레이아웃 적용
-updateRiverLayout();
+rebuildSeaGeo(550);
 
 // 유리 재질 공유
 const glassMat = new THREE.MeshStandardMaterial({
@@ -669,28 +669,29 @@ function seededRand(seed) {
   return x - Math.floor(x);
 }
 
-// z는 그룹 로컬 좌표 (buildingGroupN/S.position.z 기준 오프셋)
-// 그룹 기준점 = 강끝+140, 빌딩은 0~370 범위에 산포
-function scatterBuildings(group, count, seedOffset) {
+// z는 그룹 로컬 좌표
+// buildingGroupN: 기준점이 강 북쪽 끝 → 빌딩은 +z 방향(강에서 멀어지는 방향)으로 산포
+// buildingGroupS: 기준점이 강 남쪽 끝 → 빌딩은 -z 방향(강에서 멀어지는 방향)으로 산포
+function scatterBuildings(group, count, seedOffset, sign) {
   for (let i = 0; i < count; i++) {
     const s = i + seedOffset;
-    const x  = (seededRand(s*7+1) - 0.5) * 1400;
-    const z  = seededRand(s*7+2) * 370;          // 0~370 (로컬, 강에서 멀어지는 방향)
-    const w  = 15 + seededRand(s*7+3) * 25;
-    const d  = 15 + seededRand(s*7+4) * 20;
-    const h  = 20 + seededRand(s*7+5) * 110;
-    const typeIdx = Math.floor(seededRand(s*7+6) * 5);
+    const x   = (seededRand(s*7+1) - 0.5) * 1400;
+    const z   = seededRand(s*7+2) * 370 * sign;  // sign=+1(북) or -1(남)
+    const w   = 15 + seededRand(s*7+3) * 25;
+    const d   = 15 + seededRand(s*7+4) * 20;
+    const h   = 20 + seededRand(s*7+5) * 110;
+    const typeIdx  = Math.floor(seededRand(s*7+6) * 5);
     const brightness = 0.38 + seededRand(s*7+7) * 0.18;
-    const hue = seededRand(s*7+8);
+    const hue  = seededRand(s*7+8);
     const r = brightness + hue * 0.04;
-    const gg = brightness + hue * 0.02;
+    const gg  = brightness + hue * 0.02;
     const b = brightness + hue * 0.08;
     spawnBuilding(group, x, z, w, h, d, new THREE.Color(r,gg,b).getHex(), typeIdx);
   }
 }
 
-scatterBuildings(buildingGroupN, 80, 0);
-scatterBuildings(buildingGroupS, 80, 100);
+scatterBuildings(buildingGroupN, 80,   0, +1);  // 북쪽: +z 방향
+scatterBuildings(buildingGroupS, 80, 100, -1);  // 남쪽: -z 방향
 
 
 
