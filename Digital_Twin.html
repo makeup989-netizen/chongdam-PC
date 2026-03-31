@@ -481,8 +481,8 @@ scene.add(envGroup);
 })();
 
 // ── 한강 수면 ──
-const RIVER_W = 3000;
-let RIVER_L = 300;  // let으로 변경 → setRiverWidth로 재생성 가능
+const RIVER_W = 8000;  // 지면 전체 길이에 맞춤
+let RIVER_L = 300;
 
 let seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
 const seaMat = new THREE.MeshStandardMaterial({
@@ -669,70 +669,61 @@ function seededRand(seed) {
   return x - Math.floor(x);
 }
 
-// z는 그룹 로컬 좌표
-// buildingGroupN: 기준점이 강 북쪽 끝 → 빌딩은 +z 방향(강에서 멀어지는 방향)으로 산포
-// buildingGroupS: 기준점이 강 남쪽 끝 → 빌딩은 -z 방향(강에서 멀어지는 방향)으로 산포
-function scatterBuildings(group, count, seedOffset, sign) {
-  for (let i = 0; i < count; i++) {
-    const s = i + seedOffset;
-    const x   = (seededRand(s*7+1) - 0.5) * 1400;
-    const z   = seededRand(s*7+2) * 370 * sign;  // sign=+1(북) or -1(남)
-    const w   = 15 + seededRand(s*7+3) * 25;
-    const d   = 15 + seededRand(s*7+4) * 20;
-    const h   = 20 + seededRand(s*7+5) * 110;
-    const typeIdx  = Math.floor(seededRand(s*7+6) * 5);
-    const brightness = 0.38 + seededRand(s*7+7) * 0.18;
-    const hue  = seededRand(s*7+8);
-    const r = brightness + hue * 0.04;
-    const gg  = brightness + hue * 0.02;
-    const b = brightness + hue * 0.08;
-    spawnBuilding(group, x, z, w, h, d, new THREE.Color(r,gg,b).getHex(), typeIdx);
+// ── 격자 기반 촘촘한 도시 배치 (서울 스타일) ──
+function seededRand(seed) {
+  const x = Math.sin(seed) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
+// 격자 간격: x방향 45, z방향 45 (블록 크기 + 도로 여백)
+// x: -4000~4000, z: 0~3500 (로컬 기준)
+const GRID_X = 100, GRID_Z = 100;
+
+function fillCityGrid(group, sign, seedBase) {
+  const xStart = -4000, xEnd = 4000;
+  const zStart = 0,     zEnd = 3500;
+
+  let si = 0;
+  for (let gx = xStart; gx < xEnd; gx += GRID_X) {
+    for (let gz = zStart; gz < zEnd; gz += GRID_Z) {
+      const s = seedBase + si++;
+      // 블록 내 약간의 랜덤 오프셋 (딱딱한 격자 느낌 완화)
+      const ox = (seededRand(s*3+1) - 0.5) * 10;
+      const oz = (seededRand(s*3+2) - 0.5) * 10;
+      const x  = gx + GRID_X/2 + ox;
+      const z  = (gz + GRID_Z/2 + oz) * sign;
+
+      const w  = 18 + seededRand(s*3+3) * 22;   // 18~40
+      const d  = 18 + seededRand(s*3+4) * 20;   // 18~38
+      const h  = 15 + seededRand(s*3+5) * 140;  // 15~155 (저층~초고층 혼재)
+
+      // 서울 스타일 높이 분포: 낮은 건물 많고 간간이 고층
+      const heightRoll = seededRand(s*3+6);
+      const finalH = heightRoll < 0.5 ? h * 0.3   // 50%: 저층 (4~47)
+                   : heightRoll < 0.8 ? h * 0.6   // 30%: 중층
+                   :                    h;          // 20%: 고층
+
+      const typeIdx = Math.floor(seededRand(s*3+7) * 5);
+
+      // 색상: 서울 콘크리트 도시 톤 (회색~베이지~청회)
+      const brightness = 0.38 + seededRand(s*3+8) * 0.22;
+      const hue = seededRand(s*3+9);
+      const r = brightness + hue * 0.05;
+      const gg = brightness + hue * 0.02;
+      const b  = brightness + hue * 0.07;
+
+      spawnBuilding(group, x, z, w, finalH, d,
+        new THREE.Color(r, gg, b).getHex(), typeIdx);
+    }
   }
 }
 
-scatterBuildings(buildingGroupN, 80,   0, +1);  // 북쪽: +z 방향
-scatterBuildings(buildingGroupS, 80, 100, -1);  // 남쪽: -z 방향
+fillCityGrid(buildingGroupN, +1,    0);  // 북쪽
+fillCityGrid(buildingGroupS, -1, 9999);  // 남쪽
 
 
 
-// ── 산 능선 ──
-(function addMountains() {
-  function makeMountainRange(zPos, peaks, color, opacity=1.0) {
-    const segs = 100;
-    const geo = new THREE.PlaneGeometry(5000, 600, segs, 12);
-    const pos = geo.attributes.position;
-    for (let j = 0; j <= 12; j++) {
-      for (let i = 0; i <= segs; i++) {
-        const idx = j * (segs+1) + i;
-        const x = pos.getX(idx);
-        let h = 0;
-        peaks.forEach(([px, ph, pw]) => {
-          h += ph * Math.exp(-Math.pow((x - px) / pw, 2));
-        });
-        h *= (j / 12) * 0.85 + 0.15;
-        pos.setZ(idx, h);
-      }
-    }
-    geo.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({
-      color, roughness: 0.95, metalness: 0.0,
-      transparent: opacity < 1.0, opacity,
-    });
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(0, 0, zPos);
-    envGroup.add(m);
-  }
-
-  // Z 양수 방향 (강변북로 너머)
-  makeMountainRange( 820,  [[-1500,80,400],[-700,110,350],[0,130,380],[600,115,340],[1400,90,400]], 0x4A7A3A);
-  makeMountainRange(1100,  [[-1600,140,500],[-500,180,450],[200,200,480],[900,165,420],[1700,145,480]], 0x3A6A2A);
-  makeMountainRange(1500,  [[-1800,200,600],[-400,250,550],[300,280,580],[1100,230,520],[2000,190,580]], 0x8AAA78, 0.75);
-  // Z 음수 방향 (올림픽대로 너머)
-  makeMountainRange(-820,  [[-1500,75,400],[-600,105,350],[100,125,370],[700,110,340],[1500,85,400]], 0x4A7A3A);
-  makeMountainRange(-1080, [[-1600,135,500],[-400,175,450],[300,195,470],[1000,160,420],[1800,140,470]], 0x3A6A2A);
-  makeMountainRange(-1480, [[-1800,195,600],[-300,245,550],[400,275,570],[1200,225,520],[2100,185,570]], 0x8AAA78, 0.75);
-})();
+// ── 산 없음 (구조물로 대체) ──
 
 // ══════════════════════════════════════════════
 // 배경 회전 / 수위 제어 (콘솔에서 직접 사용)
@@ -1201,22 +1192,36 @@ window.envInfo = () => {
 };
 
 // ── 모델 위치 / 회전 ──
+// ── 모델 위치 / 회전 ──
 window.setModelPos = (x, y, z) => {
-  bridgeGroup.position.set(x, y, z);
+  // deform 애니메이션이 켜져 있으면 position.y를 매 프레임 덮어쓰므로 먼저 끔
+  if (deformOn) {
+    deformOn = false;
+    document.getElementById('deform-toggle').textContent = 'DEFORM OFF';
+    document.getElementById('deform-toggle').classList.remove('active');
+    console.log('[deform] 위치 고정을 위해 DEFORM OFF로 전환');
+  }
+  bridgeGroup.position.set(parseFloat(x), parseFloat(y), parseFloat(z));
   console.log(`[bridgeGroup] position → (${x}, ${y}, ${z})`);
 };
 window.moveModel = (dx, dy, dz) => {
-  bridgeGroup.position.x += dx;
-  bridgeGroup.position.y += dy;
-  bridgeGroup.position.z += dz;
+  if (deformOn) {
+    deformOn = false;
+    document.getElementById('deform-toggle').textContent = 'DEFORM OFF';
+    document.getElementById('deform-toggle').classList.remove('active');
+    console.log('[deform] 위치 고정을 위해 DEFORM OFF로 전환');
+  }
+  bridgeGroup.position.x += parseFloat(dx||0);
+  bridgeGroup.position.y += parseFloat(dy||0);
+  bridgeGroup.position.z += parseFloat(dz||0);
   const p = bridgeGroup.position;
-  console.log(`[bridgeGroup] position → (${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)})`);
+  console.log(`[bridgeGroup] position → (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
 };
 window.setModelRot = (x, y, z) => {
   bridgeGroup.rotation.set(
-    THREE.MathUtils.degToRad(x),
-    THREE.MathUtils.degToRad(y),
-    THREE.MathUtils.degToRad(z)
+    THREE.MathUtils.degToRad(parseFloat(x)),
+    THREE.MathUtils.degToRad(parseFloat(y)),
+    THREE.MathUtils.degToRad(parseFloat(z))
   );
   console.log(`[bridgeGroup] rotation → (${x}°, ${y}°, ${z}°)`);
 };
@@ -1225,7 +1230,8 @@ window.modelInfo = () => {
   const r = bridgeGroup.rotation;
   console.log(`[bridgeGroup]
   position : (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})
-  rotation : (${THREE.MathUtils.radToDeg(r.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.z).toFixed(1)}°)`);
+  rotation : (${THREE.MathUtils.radToDeg(r.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.z).toFixed(1)}°)
+  deformOn : ${deformOn}`);
 };
 window.moveMarker = (id,x,y,z) => { const m=markerMeshes[id]; if(m){m.position.set(x,y,z);console.log(`${id} → (${x},${y},${z})`);} };
 window.listMarkers = () => SENSORS.forEach(s=>{ const m=markerMeshes[s.id]; if(m)console.log(`${s.id}: ${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}`); });
