@@ -430,20 +430,20 @@ async function loadMemberGrades() {
 loadMemberGrades();
 
 const SENSORS = [
-  { id:'EM_P39P40_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[8,    24.5,  -21.5], axis:'x',  range:[-5,5],    noLimit:true },
-  { id:'EM_P42P43_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-21.5,24.5,   59.8], axis:'x',  range:[-5,5],    noLimit:true },
-  { id:'EM_P37_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[33.5, 24.5,  -91],   axis:'x',  range:[-5,5],    noLimit:true },
-  { id:'EM_P45_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-47.2,24.5,   130],  axis:'x',  range:[-5,5],    noLimit:true },
-  { id:'T_P40_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[2.5,  20.5,  -15.7], axis:'rz', range:[-1.5,1.5], noLimit:true },
-  { id:'T_P40_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-0.5, 20.5,  -8],    axis:'rz', range:[-1.5,1.5], noLimit:true },
-  { id:'T_P42_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-8.5, 20.5,   14.5], axis:'rz', range:[-1.5,1.5], noLimit:true },
-  { id:'T_P42_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-11,  20.5,   22.2], axis:'rz', range:[-1.5,1.5], noLimit:true },
-  { id:'Temp_P39P40_01',type:'온도계',    unit:'℃',   color:'#FFC83C', pos:[3,    21.5,  -17.5], axis:'t',  range:[-10,50],   noLimit:true },
-  { id:'WG_WD',         type:'풍향',      unit:'°',   color:'#50AAFF', pos:[4.1,  24.5,  -10.8], axis:'w',  range:[0,360], noLimit:true },
-  { id:'WG_WS_A',       type:'풍속(평균)',unit:'m/s', color:'#50AAFF', pos:[5,    24.5,  -13.1], axis:'w',  range:[0,30],  noLimit:true },
-  { id:'WG_WS_M',       type:'풍속(최대)',unit:'m/s', color:'#50AAFF', pos:[3.2,  24.5,  -8.5],  axis:'w',  range:[0,40],  noLimit:true },
-  { id:'AC_P36P37_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[35.5, 24.5,  -97],   axis:'z',  range:[0,200], noLimit:true },
-  { id:'AC_P37P38_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[30,   24.5,  -82],   axis:'z',  range:[0,200], noLimit:true },
+  { id:'EM_P39P40_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[8,    14.5,  -21.5], axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P42P43_01',  type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-21.5,14.5,   59.8], axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P37_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[33.5, 14.5,  -91],   axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'EM_P45_01',     type:'신축변위계', unit:'mm',  color:'#FF8250', pos:[-47.2,14.5,   130],  axis:'x',  range:[-5,5],    noLimit:true },
+  { id:'T_P40_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[2.5,  10.5,  -15.7], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P40_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-0.5, 10.5,  -8],    axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P42_01',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-8.5, 10.5,   14.5], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'T_P42_02',      type:'경사계',    unit:'°',   color:'#50DCA0', pos:[-11,  10.5,   22.2], axis:'rz', range:[-1.5,1.5], noLimit:true },
+  { id:'Temp_P39P40_01',type:'온도계',    unit:'℃',   color:'#FFC83C', pos:[3,    11.5,  -17.5], axis:'t',  range:[-10,50],   noLimit:true },
+  { id:'WG_WD',         type:'풍향',      unit:'°',   color:'#50AAFF', pos:[4.1,  14.5,  -10.8], axis:'w',  range:[0,360], noLimit:true },
+  { id:'WG_WS_A',       type:'풍속(평균)',unit:'m/s', color:'#50AAFF', pos:[5,    14.5,  -13.1], axis:'w',  range:[0,30],  noLimit:true },
+  { id:'WG_WS_M',       type:'풍속(최대)',unit:'m/s', color:'#50AAFF', pos:[3.2,  14.5,  -8.5],  axis:'w',  range:[0,40],  noLimit:true },
+  { id:'AC_P36P37_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[35.5, 14.5,  -97],   axis:'z',  range:[0,200], noLimit:true },
+  { id:'AC_P37P38_Z_01',type:'가속도계',  unit:'gal', color:'#C850FF', pos:[30,   14.5,  -82],   axis:'z',  range:[0,200], noLimit:true },
 ];
 
 let csvData = null, csvLoading = false;
