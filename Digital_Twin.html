@@ -481,10 +481,10 @@ scene.add(envGroup);
 })();
 
 // ── 한강 수면 ──
-// 모델이 Z축 방향(길이 750m)이므로, 강은 X축 방향으로 넓게, Z축 방향으로 강폭
-const RIVER_W = 3000;   // 강 길이 방향 (모델 Z축과 같은 방향 → 나중에 envGroup이 90도 돌면 X방향이 됨)
-const RIVER_L = 300;    // 강 폭
-const seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
+const RIVER_W = 3000;
+let RIVER_L = 300;  // let으로 변경 → setRiverWidth로 재생성 가능
+
+let seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
 const seaMat = new THREE.MeshStandardMaterial({
   color: 0x1A7AAA, emissive: 0x0A3A55, emissiveIntensity: 0.1,
   roughness: 0.1, metalness: 0.7,
@@ -492,12 +492,23 @@ const seaMat = new THREE.MeshStandardMaterial({
 });
 const seaMesh = new THREE.Mesh(seaGeo, seaMat);
 seaMesh.rotation.x = -Math.PI / 2;
-seaMesh.position.y = 0;   // ← 0으로 고정
+seaMesh.position.y = 0;
 envGroup.add(seaMesh);
 
-const seaPositions = seaGeo.attributes.position;
-const seaOriginZ = new Float32Array(seaPositions.count);
+let seaPositions = seaGeo.attributes.position;
+let seaOriginZ = new Float32Array(seaPositions.count);
 for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i);
+
+// 강 폭 재생성 함수 (animate 루프가 seaPositions/seaOriginZ를 참조하므로 함께 교체)
+function rebuildSeaGeo(newWidth) {
+  RIVER_L = newWidth;
+  seaGeo.dispose();
+  seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
+  seaMesh.geometry = seaGeo;
+  seaPositions = seaGeo.attributes.position;
+  seaOriginZ = new Float32Array(seaPositions.count);
+  for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i);
+}
 
 // ── 지면 ──
 const groundGeo = new THREE.PlaneGeometry(8000, 8000, 1, 1);
@@ -572,57 +583,167 @@ makePlane(RIVER_W, 30,   0, -270, 0.5, 0x333A3A);  // 올림픽대로
   makeCloud( 900, 600, -1200, 1.1);
 })();
 
-// ── 도시 빌딩 헬퍼 ──
-function makeBuilding(x, z, w, h, d, color) {
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 });
-  const m = new THREE.Mesh(geo, mat);
-  m.position.set(x, h / 2, z);
-  m.castShadow = true;
-  envGroup.add(m);
-  const winGeo = new THREE.BoxGeometry(w*0.9, h*0.95, d*0.9);
-  const winMat = new THREE.MeshStandardMaterial({
-    color: 0x88BBDD, transparent: true, opacity: 0.3,
-    metalness: 0.9, roughness: 0.05,
-  });
-  const win = new THREE.Mesh(winGeo, winMat);
-  win.position.set(x, h / 2, z);
-  envGroup.add(win);
+// ══════════════════════════════════════════════
+// 도시 빌딩 시스템
+// ══════════════════════════════════════════════
+const buildingGroup = new THREE.Group();
+envGroup.add(buildingGroup);
+
+// 유리 재질 공유
+const glassMat = new THREE.MeshStandardMaterial({
+  color: 0x88BBDD, transparent: true, opacity: 0.28,
+  metalness: 0.95, roughness: 0.04,
+});
+
+// ── 빌딩 타입 1: 기본 타워 + 유리 오버레이 ──
+function makeBoxTower(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.35 }));
+  body.position.y = h / 2;
+  body.castShadow = true;
+  g.add(body);
+  // 유리 외피 (살짝 작게)
+  const win = new THREE.Mesh(new THREE.BoxGeometry(w*0.88, h*0.96, d*0.88), glassMat);
+  win.position.y = h / 2;
+  g.add(win);
+  // 옥상 안테나
+  if (h > 60) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, h*0.12, 6),
+      new THREE.MeshStandardMaterial({ color: 0xAAAAAA, metalness: 0.9, roughness: 0.1 }));
+    ant.position.y = h + h*0.06;
+    g.add(ant);
+  }
+  g.position.set(x, 0, z);
+  buildingGroup.add(g);
+  return g;
 }
 
-// ── 강남 빌딩군 (Z 양수 = 강변북로 너머) ──
-const buildingsS = [
-  [-500,310,18,45,18],[-390,310,22,60,20],[-270,310,20,38,18],[-150,310,25,55,22],
-  [ -30,310,18,48,18],[  90,310,22,65,20],[ 210,310,20,42,18],[ 330,310,24,58,22],
-  [ 450,310,18,50,18],[ 570,310,20,44,18],[-620,310,16,36,16],[ 690,310,16,40,16],
-  [-480,450,20,70,20],[-350,450,24,85,22],[-220,450,22,58,20],[ -90,450,26,75,24],
-  [  40,450,20,62,20],[ 170,450,24,80,22],[ 300,450,22,68,20],[ 430,450,20,72,20],
-  [ 560,450,18,55,18],[-600,450,16,50,16],[ 680,450,16,52,16],
-  [-520,600,22,90,20],[-380,600,26,110,24],[-240,600,24,78,22],[-100,600,28,95,26],
-  [  40,600,22,85,20],[ 180,600,26,105,24],[ 320,600,24,88,22],[ 460,600,22,92,20],
-  [ 600,600,20,75,20],[-660,600,18,65,18],[ 720,600,18,70,18],
-];
-buildingsS.forEach(([x,z,w,h,d]) => {
-  const r = 0.52+Math.random()*0.15, g = r+0.02, b = r+0.06;
-  makeBuilding(x, z, w, h, d, new THREE.Color(r,g,b).getHex());
-});
+// ── 빌딩 타입 2: 포디엄(저층부) + 타워(고층부) ──
+function makePodiumTower(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const podH = h * 0.25, towH = h * 0.78;
+  const podW = w * 1.5, podD = d * 1.5;
+  // 포디엄
+  const pod = new THREE.Mesh(new THREE.BoxGeometry(podW, podH, podD),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.2 }));
+  pod.position.y = podH / 2;
+  pod.castShadow = true;
+  g.add(pod);
+  // 타워
+  const tow = new THREE.Mesh(new THREE.BoxGeometry(w, towH, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.5 }));
+  tow.position.y = podH + towH / 2;
+  tow.castShadow = true;
+  g.add(tow);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(w*0.86, towH*0.97, d*0.86), glassMat);
+  win.position.y = podH + towH / 2;
+  g.add(win);
+  g.position.set(x, 0, z);
+  buildingGroup.add(g);
+  return g;
+}
 
-// ── 강북 빌딩군 (Z 음수 = 올림픽대로 너머) ──
-const buildingsN = [
-  [-500,-310,18,42,18],[-380,-310,22,58,20],[-250,-310,20,35,18],[-120,-310,25,52,22],
-  [  10,-310,18,45,18],[ 130,-310,22,62,20],[ 250,-310,20,40,18],[ 380,-310,24,55,22],
-  [ 510,-310,18,47,18],[ 640,-310,20,42,18],[-630,-310,16,34,16],[ 760,-310,16,38,16],
-  [-460,-460,20,65,20],[-320,-460,24,82,22],[-180,-460,22,55,20],[ -40,-460,26,72,24],
-  [ 100,-460,20,60,20],[ 240,-460,24,78,22],[ 380,-460,22,65,20],[ 520,-460,20,70,20],
-  [ 660,-460,18,52,18],[-590,-460,16,48,16],[ 780,-460,16,50,16],
-  [-500,-610,22,88,20],[-355,-610,26,108,24],[-210,-610,24,75,22],[ -65,-610,28,92,26],
-  [  80,-610,22,82,20],[ 225,-610,26,102,24],[ 370,-610,24,85,22],[ 515,-610,22,90,20],
-  [ 660,-610,20,72,20],[-640,-610,18,62,18],[ 780,-610,18,68,18],
-];
-buildingsN.forEach(([x,z,w,h,d]) => {
-  const r = 0.50+Math.random()*0.15, g = r+0.01, b = r+0.04;
-  makeBuilding(x, z, w, h, d, new THREE.Color(r,g,b).getHex());
-});
+// ── 빌딩 타입 3: 계단식 세트백 ──
+function makeSetbackTower(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 });
+  const steps = 3;
+  let curY = 0;
+  for (let i = 0; i < steps; i++) {
+    const ratio = 1 - i * 0.28;
+    const sh = h / steps;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w*ratio, sh, d*ratio), mat);
+    b.position.y = curY + sh / 2;
+    b.castShadow = true;
+    g.add(b);
+    curY += sh;
+  }
+  g.position.set(x, 0, z);
+  buildingGroup.add(g);
+  return g;
+}
+
+// ── 빌딩 타입 4: 쌍둥이 타워 ──
+function makeTwinTower(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.5 });
+  [-1, 1].forEach(side => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(w*0.45, h, d), mat);
+    t.position.set(side * w * 0.3, h / 2, 0);
+    t.castShadow = true;
+    g.add(t);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(w*0.38, h*0.97, d*0.88), glassMat);
+    win.position.set(side * w * 0.3, h / 2, 0);
+    g.add(win);
+  });
+  // 연결 브릿지 (중간 높이)
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(w*0.6, h*0.05, d*0.5),
+    new THREE.MeshStandardMaterial({ color: 0xCCCCCC, metalness: 0.8, roughness: 0.2 }));
+  bridge.position.y = h * 0.6;
+  g.add(bridge);
+  g.position.set(x, 0, z);
+  buildingGroup.add(g);
+  return g;
+}
+
+// ── 빌딩 타입 5: 저층 상업 블록 ──
+function makeCommercial(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.1 }));
+  body.position.y = h / 2;
+  body.castShadow = true;
+  g.add(body);
+  // 간판 느낌 전면부
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(w*0.95, h*0.15, 1),
+    new THREE.MeshStandardMaterial({ color: 0xFFFFFF, emissive: 0xFFFFFF, emissiveIntensity: 0.1 }));
+  sign.position.set(0, h*0.85, d/2 + 0.5);
+  g.add(sign);
+  g.position.set(x, 0, z);
+  buildingGroup.add(g);
+  return g;
+}
+
+// ── 빌딩 생성 함수 (타입 랜덤 선택) ──
+const buildingTypes = [makeBoxTower, makePodiumTower, makeSetbackTower, makeTwinTower, makeCommercial];
+function spawnBuilding(x, z, w, h, d, colorHex, typeHint) {
+  const type = typeHint !== undefined ? typeHint : Math.floor(Math.random() * buildingTypes.length);
+  buildingTypes[type](x, z, w, h, d, colorHex);
+}
+
+// ── 빌딩 배치: 랜덤 산포 ──
+// 시드 기반 pseudo-random (매 로드마다 동일한 배치)
+function seededRand(seed) {
+  const x = Math.sin(seed) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
+// 북쪽(z 양수) / 남쪽(z 음수) 각각 구역 정의
+// 구역: z=[310,680], x=[-700,750] 안에서 랜덤 산포
+function scatterBuildings(zMin, zMax, zSign, count, seedOffset) {
+  for (let i = 0; i < count; i++) {
+    const s = i + seedOffset;
+    const x  = (seededRand(s*7+1) - 0.5) * 1400;         // -700 ~ +700
+    const z  = (zMin + seededRand(s*7+2) * (zMax-zMin)) * zSign;
+    const w  = 15 + seededRand(s*7+3) * 25;               // 15~40
+    const d  = 15 + seededRand(s*7+4) * 20;               // 15~35
+    const h  = 20 + seededRand(s*7+5) * 110;              // 20~130
+    const typeIdx = Math.floor(seededRand(s*7+6) * buildingTypes.length);
+    const brightness = 0.38 + seededRand(s*7+7) * 0.18;
+    const hue = seededRand(s*7+8);
+    // 약간 따뜻한 회색~청회색 팔레트
+    const r = brightness + hue * 0.04;
+    const g = brightness + hue * 0.02;
+    const b = brightness + hue * 0.08;
+    spawnBuilding(x, z, w, h, d, new THREE.Color(r,g,b).getHex(), typeIdx);
+  }
+}
+
+scatterBuildings(310, 680, +1, 80, 0);    // 북쪽 80개
+scatterBuildings(310, 680, -1, 80, 100);  // 남쪽 80개
+
+
 
 // ── 산 능선 ──
 (function addMountains() {
@@ -1082,11 +1203,24 @@ window.setSeaY = (y) => {
 };
 
 // ── 강 폭 ──
-// setRiverWidth(배율)  기본값 1.0 = 원래 폭(RIVER_L=300)
-// 예) setRiverWidth(2.0) → 폭 2배,  setRiverWidth(0.5) → 절반
-window.setRiverWidth = (scale) => {
-  seaMesh.scale.z = parseFloat(scale);
-  console.log(`[seaMesh] 강 폭 배율 → ${scale}× (기준 ${RIVER_L})`);
+// setRiverWidth(폭)  단위값으로 직접 지정 (기본 300)
+// 예) setRiverWidth(600) → 폭 2배
+window.setRiverWidth = (width) => {
+  rebuildSeaGeo(parseFloat(width));
+  console.log(`[seaMesh] 강 폭 → ${width} (기준 300)`);
+};
+
+// ── 빌딩 전체 크기 ──
+// setBuildingScale(배율)  기본값 1.0
+// 예) setBuildingScale(1.5) → 빌딩 전체 1.5배
+window.setBuildingScale = (scale) => {
+  buildingGroup.scale.setScalar(parseFloat(scale));
+  console.log(`[buildingGroup] 빌딩 크기 배율 → ${scale}×`);
+};
+// setBuildingScaleXYZ(x, y, z) → 높이만, 또는 폭만 조정 가능
+window.setBuildingScaleXYZ = (x, y, z) => {
+  buildingGroup.scale.set(parseFloat(x), parseFloat(y), parseFloat(z));
+  console.log(`[buildingGroup] 빌딩 스케일 → (${x}, ${y}, ${z})`);
 };
 
 // ── envGroup 전체 위치 ──
@@ -1111,7 +1245,8 @@ window.envInfo = () => {
   position      : (${envGroup.position.x.toFixed(1)}, ${envGroup.position.y.toFixed(1)}, ${envGroup.position.z.toFixed(1)})
   scale         : ${envGroup.scale.x.toFixed(3)}
   seaMesh.y     : ${seaMesh.position.y.toFixed(2)}
-  riverWidth ×  : ${seaMesh.scale.z.toFixed(2)}`);
+  riverWidth ×  : ${seaMesh.scale.z.toFixed(2)}
+  buildingScale×: ${buildingGroup.scale.x.toFixed(2)}`);
 };
 
 // ── 센서 마커 위치 ──
@@ -1130,8 +1265,13 @@ window.help = () => console.log(`
 ║                                        ║
 ║  강 수위 / 폭                          ║
 ║   setSeaY(-5)       수면 Y 위치 지정   ║
-║   setRiverWidth(2)  강 폭 배율 조정    ║
-║                     (기본값 1.0)        ║
+║   setRiverWidth(600) 강 폭 직접 지정   ║
+║                     (기본값 300)        ║
+║                                        ║
+║  빌딩 크기                             ║
+║   setBuildingScale(1.5)  전체 배율     ║
+║   setBuildingScaleXYZ(1,2,1)           ║
+║     → X/Y(높이)/Z 축별 조정           ║
 ║                                        ║
 ║  배경 위치 / 스케일                    ║
 ║   setEnvPos(0,0,10) 배경 위치 이동     ║
