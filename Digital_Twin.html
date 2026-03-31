@@ -125,6 +125,7 @@
   }
   .scale-display span { color:var(--accent); }
 
+  /* ── 우측 상단 컨트롤 패널 (변형배율 + 배경회전) ── */
   .deform-control {
     position:absolute; top:14px; right:14px;
     background:rgba(13,20,32,.85);
@@ -275,10 +276,13 @@
       <button class="ctrl-btn" onclick="setView('side')">SIDE</button>
       <button class="ctrl-btn" id="deform-toggle" onclick="toggleDeform()">DEFORM ON</button>
     </div>
+
+    <!-- ── 우측 상단: 변형배율 슬라이더 ── -->
     <div class="deform-control">
       <div class="deform-label">변형 배율: <span id="scale-val">50</span>×</div>
       <input type="range" id="scale-slider" min="1" max="200" value="50" oninput="updateScale(this.value)">
     </div>
+
     <div class="legend">
       <div class="legend-title">상태평가 등급</div>
       <div class="legend-item"><div class="legend-dot" style="background:#2196F3"></div>A등급</div>
@@ -342,16 +346,10 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 
-// GLB: GitHub LFS (chongdam-pc 저장소)
 const GLB_PATH = 'https://media.githubusercontent.com/media/makeup989-netizen/chongdam-pc/master/output/chongdam_bridge.glb';
 
-// 상태평가 등급별 색상
 const GRADE_COLORS = {
-  'a': 0x2196F3,  // 파란색
-  'b': 0x4CAF50,  // 초록색
-  'c': 0xFFEB3B,  // 노란색
-  'd': 0xFF9800,  // 주황색
-  'e': 0xF44336,  // 빨간색
+  'a': 0x2196F3, 'b': 0x4CAF50, 'c': 0xFFEB3B, 'd': 0xFF9800, 'e': 0xF44336,
 };
 
 let memberGrades = {};
@@ -360,9 +358,7 @@ async function loadMemberGrades() {
     const res = await fetch('./output/member_grades.json');
     memberGrades = await res.json();
     console.log(`[OK] member_grades.json 로드 완료: ${Object.keys(memberGrades).length}개 부재`);
-  } catch(e) {
-    console.warn('[WARN] member_grades.json 로드 실패', e);
-  }
+  } catch(e) { console.warn('[WARN] member_grades.json 로드 실패', e); }
 }
 loadMemberGrades();
 
@@ -427,21 +423,22 @@ function genData(sensor) {
   return Array.from({length:48},(_,i)=>mid+(Math.random()-.5)*span+Math.sin(i*.3)*span*.3);
 }
 
-// Three.js
+// ── Three.js 기본 세팅 ──
 const canvas = document.getElementById('three-canvas');
 const wrap   = document.getElementById('canvas-wrap');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setClearColor(0x87CEEB, 1);
+renderer.shadowMap.enabled = true;
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 50000);
 camera.position.set(0, 800, 1500);
 camera.lookAt(0, 0, 0);
 
-// ── 조명 (맑은 낮 분위기) ──
+// 조명
 scene.add(new THREE.AmbientLight(0xFFFFFF, 0.7));
-const sunLight = new THREE.DirectionalLight(0xFFF5E0, 1.8);  // 밝은 태양
+const sunLight = new THREE.DirectionalLight(0xFFF5E0, 1.8);
 sunLight.position.set(500, 800, -300);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(2048, 2048);
@@ -449,39 +446,44 @@ sunLight.shadow.camera.near = 1; sunLight.shadow.camera.far = 2000;
 sunLight.shadow.camera.left = -600; sunLight.shadow.camera.right = 600;
 sunLight.shadow.camera.top = 600; sunLight.shadow.camera.bottom = -600;
 scene.add(sunLight);
-const fillLight = new THREE.DirectionalLight(0xCCDDFF, 0.8);  // 하늘 반사광
+const fillLight = new THREE.DirectionalLight(0xCCDDFF, 0.8);
 fillLight.position.set(-300, 200, 300);
 scene.add(fillLight);
-scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4A7A3A, 0.9));  // 하늘/땅 색
-// 안개 (맑은 날 원거리)
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4A7A3A, 0.9));
 scene.fog = new THREE.Fog(0xC8E8FF, 3000, 10000);
 
 // ══════════════════════════════════════════════
-// 한강 + 서울 도시 배경 (고급 - 낮)
+// envGroup: 강변/도로/건물 등 배경 전체 묶음
+// 슬라이더로 Y축 회전 → 모델 방향과 맞춤
 // ══════════════════════════════════════════════
+const envGroup = new THREE.Group();
+scene.add(envGroup);
 
-// ── 스카이박스 (맑은 낮 하늘) ──
+// ── 스카이박스 ──
 (function buildSky() {
   const skyGeo = new THREE.SphereGeometry(8000, 32, 16);
   const skyCanvas = document.createElement('canvas');
   skyCanvas.width = 2; skyCanvas.height = 512;
   const skyCtx = skyCanvas.getContext('2d');
   const grad = skyCtx.createLinearGradient(0, 0, 0, 512);
-  grad.addColorStop(0.0,  '#1A6ECC');   // 최상단 파란 하늘
-  grad.addColorStop(0.3,  '#3A9AE8');   // 맑은 하늘
-  grad.addColorStop(0.6,  '#7AC8F0');   // 지평선 위
-  grad.addColorStop(0.8,  '#B8E0F8');   // 지평선 근처
-  grad.addColorStop(0.9,  '#D8EEF5');   // 지평선
-  grad.addColorStop(1.0,  '#E8F4F0');   // 바닥
+  grad.addColorStop(0.0,  '#1A6ECC');
+  grad.addColorStop(0.3,  '#3A9AE8');
+  grad.addColorStop(0.6,  '#7AC8F0');
+  grad.addColorStop(0.8,  '#B8E0F8');
+  grad.addColorStop(0.9,  '#D8EEF5');
+  grad.addColorStop(1.0,  '#E8F4F0');
   skyCtx.fillStyle = grad;
   skyCtx.fillRect(0, 0, 2, 512);
   const skyTex = new THREE.CanvasTexture(skyCanvas);
   const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
+  // 스카이박스는 envGroup에 넣지 않음 (항상 고정)
   scene.add(new THREE.Mesh(skyGeo, skyMat));
 })();
 
-// ── 한강 수면 (모델 Z=750m 기준 폭 300m) ──
-const RIVER_W = 3000, RIVER_L = 300;
+// ── 한강 수면 ──
+// 모델이 Z축 방향(길이 750m)이므로, 강은 X축 방향으로 넓게, Z축 방향으로 강폭
+const RIVER_W = 3000;   // 강 길이 방향 (모델 Z축과 같은 방향 → 나중에 envGroup이 90도 돌면 X방향이 됨)
+const RIVER_L = 300;    // 강 폭
 const seaGeo = new THREE.PlaneGeometry(RIVER_W, RIVER_L, 120, 30);
 const seaMat = new THREE.MeshStandardMaterial({
   color: 0x1A7AAA, emissive: 0x0A3A55, emissiveIntensity: 0.1,
@@ -490,36 +492,43 @@ const seaMat = new THREE.MeshStandardMaterial({
 });
 const seaMesh = new THREE.Mesh(seaGeo, seaMat);
 seaMesh.rotation.x = -Math.PI / 2;
-scene.add(seaMesh);
+seaMesh.position.y = 0;   // ← 0으로 고정
+envGroup.add(seaMesh);
+
 const seaPositions = seaGeo.attributes.position;
 const seaOriginZ = new Float32Array(seaPositions.count);
 for (let i = 0; i < seaPositions.count; i++) seaOriginZ[i] = seaPositions.getY(i);
 
-// ── 지면 (전체 배경 땅) ──
+// ── 지면 ──
 const groundGeo = new THREE.PlaneGeometry(8000, 8000, 1, 1);
 const groundMat = new THREE.MeshStandardMaterial({ color: 0x4A6A3A, roughness: 0.95, metalness: 0.0 });
 const groundMesh = new THREE.Mesh(groundGeo, groundMat);
 groundMesh.rotation.x = -Math.PI / 2;
 groundMesh.position.y = -2;
-scene.add(groundMesh);
+envGroup.add(groundMesh);
 
-// ── 강변 둔치 + 도로 (한강 바로 옆) ──
+// ── 강변 둔치 + 도로 헬퍼 ──
+// 모델이 Z축으로 길게 뻗어있으므로 강변도 Z축 방향으로 길게 (RIVER_W)
+// X 방향이 강폭 방향
 function makePlane(w, l, x, z, y, color) {
   const geo = new THREE.PlaneGeometry(w, l, 1, 1);
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.0 });
   const m = new THREE.Mesh(geo, mat);
   m.rotation.x = -Math.PI / 2;
   m.position.set(x, y, z);
-  scene.add(m);
+  envGroup.add(m);
 }
-// 북쪽 (z 음수): 한강(0) → 둔치 → 공원 → 도로
-makePlane(3000, 40,  0, -170, 0.3, 0x999999);  // 콘크리트 둔치
-makePlane(3000, 80,  0, -220, 0.2, 0x5A8A3A);  // 강변 공원
-makePlane(3000, 30,  0, -270, 0.5, 0x333A3A);  // 강변북로
-// 남쪽 (z 양수)
-makePlane(3000, 40,  0,  170, 0.3, 0x999999);
-makePlane(3000, 80,  0,  220, 0.2, 0x5A8A3A);
-makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
+
+// 강폭 기준으로 양쪽에 둔치/공원/도로 배치
+// 강: X=[-150, +150] → 둔치, 공원, 도로 순으로 외곽
+// 북쪽 (x 양수 방향)
+makePlane(RIVER_W, 40,   170, 0, 0.3, 0x999999);  // 콘크리트 둔치
+makePlane(RIVER_W, 80,   220, 0, 0.2, 0x5A8A3A);  // 강변 공원
+makePlane(RIVER_W, 30,   270, 0, 0.5, 0x333A3A);  // 강변북로
+// 남쪽 (x 음수 방향)
+makePlane(RIVER_W, 40,  -170, 0, 0.3, 0x999999);
+makePlane(RIVER_W, 80,  -220, 0, 0.2, 0x5A8A3A);
+makePlane(RIVER_W, 30,  -270, 0, 0.5, 0x333A3A);  // 올림픽대로
 
 // ── 태양 ──
 (function addSun() {
@@ -527,8 +536,7 @@ makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
   const sunMat = new THREE.MeshBasicMaterial({ color: 0xFFFFCC });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   sun.position.set(1500, 1200, -3000);
-  scene.add(sun);
-  // 태양 글로우
+  scene.add(sun);  // 태양은 scene에 직접 (envGroup 회전에 영향받지 않도록)
   const glowGeo = new THREE.SphereGeometry(70, 16, 16);
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xFFFF88, transparent: true, opacity: 0.25 });
   const glow = new THREE.Mesh(glowGeo, glowMat);
@@ -540,8 +548,8 @@ makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
 (function addClouds() {
   function makeCloud(x, y, z, scale) {
     const group = new THREE.Group();
-    [[0,0,0,1.0], [-1.2,0.1,0,0.7], [1.2,0.1,0,0.7],
-     [0,0.5,0,0.6], [-0.6,0.4,0.5,0.5], [0.6,0.4,-0.5,0.5]
+    [[0,0,0,1.0],[-1.2,0.1,0,0.7],[1.2,0.1,0,0.7],
+     [0,0.5,0,0.6],[-0.6,0.4,0.5,0.5],[0.6,0.4,-0.5,0.5]
     ].forEach(([cx,cy,cz,cs]) => {
       const geo = new THREE.SphereGeometry(50*cs*scale, 8, 6);
       const mat = new THREE.MeshStandardMaterial({
@@ -552,7 +560,7 @@ makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
       group.add(m);
     });
     group.position.set(x, y, z);
-    scene.add(group);
+    scene.add(group);  // 구름도 scene에 직접
     return group;
   }
   makeCloud(-800, 400, -1500, 1.2);
@@ -562,78 +570,75 @@ makePlane(3000, 30,  0,  270, 0.5, 0x333A3A);  // 올림픽대로
   makeCloud( 900, 600, -1200, 1.1);
 })();
 
-// ── 도시 빌딩 (강남/강북 - 모델 스케일에 맞게 조정) ──
+// ── 도시 빌딩 헬퍼 ──
 function makeBuilding(x, z, w, h, d, color) {
   const geo = new THREE.BoxGeometry(w, h, d);
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 });
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, h / 2, z);
   m.castShadow = true;
-  scene.add(m);
-  // 유리창 효과 (밝은 면)
-  const winGeo = new THREE.BoxGeometry(w * 0.9, h * 0.95, d * 0.9);
+  envGroup.add(m);
+  const winGeo = new THREE.BoxGeometry(w*0.9, h*0.95, d*0.9);
   const winMat = new THREE.MeshStandardMaterial({
     color: 0x88BBDD, transparent: true, opacity: 0.3,
     metalness: 0.9, roughness: 0.05,
   });
   const win = new THREE.Mesh(winGeo, winMat);
   win.position.set(x, h / 2, z);
-  scene.add(win);
+  envGroup.add(win);
 }
 
-// ── 강남 빌딩군 (남쪽 - 도로 뒤, 300~700m) ──
+// ── 강남 빌딩군 (X 양수 = 강 북쪽 뒤) ──
+// 강변 도로(x=270)보다 더 바깥(x=310~700)
 const buildingsS = [
-  // 1열 (310~420m) - 낮은 빌딩
-  [-500,340,18,45,18],[-390,325,22,60,20],[-270,345,20,38,18],[-150,330,25,55,22],
-  [-30,340,18,48,18],[90,328,22,65,20],[210,342,20,42,18],[330,330,24,58,22],
-  [450,340,18,50,18],[570,328,20,44,18],[-620,335,16,36,16],[690,340,16,40,16],
-  // 2열 (450~560m) - 중층
-  [-480,490,20,70,20],[-350,475,24,85,22],[-220,490,22,58,20],[-90,478,26,75,24],
-  [40,490,20,62,20],[170,476,24,80,22],[300,490,22,68,20],[430,478,20,72,20],
-  [560,490,18,55,18],[-600,482,16,50,16],[680,488,16,52,16],
-  // 3열 (600~700m) - 고층
-  [-520,640,22,90,20],[-380,625,26,110,24],[-240,640,24,78,22],[-100,628,28,95,26],
-  [40,640,22,85,20],[180,626,26,105,24],[320,640,24,88,22],[460,628,22,92,20],
-  [600,640,20,75,20],[-660,632,18,65,18],[720,638,18,70,18],
+  [310, -500,18,45,18],[310,-390,22,60,20],[310,-270,20,38,18],[310,-150,25,55,22],
+  [310, -30,18,48,18], [310, 90,22,65,20], [310, 210,20,42,18],[310, 330,24,58,22],
+  [310, 450,18,50,18], [310, 570,20,44,18],[310,-620,16,36,16],[310, 690,16,40,16],
+  [450, -480,20,70,20],[450,-350,24,85,22],[450,-220,22,58,20],[450,-90,26,75,24],
+  [450,  40,20,62,20], [450, 170,24,80,22],[450, 300,22,68,20],[450, 430,20,72,20],
+  [450, 560,18,55,18], [450,-600,16,50,16],[450, 680,16,52,16],
+  [600, -520,22,90,20],[600,-380,26,110,24],[600,-240,24,78,22],[600,-100,28,95,26],
+  [600,  40,22,85,20], [600, 180,26,105,24],[600, 320,24,88,22],[600, 460,22,92,20],
+  [600, 600,20,75,20], [600,-660,18,65,18],[600, 720,18,70,18],
 ];
 buildingsS.forEach(([x,z,w,h,d]) => {
   const r = 0.52+Math.random()*0.15, g = r+0.02, b = r+0.06;
-  makeBuilding(x,z,w,h,d,new THREE.Color(r,g,b).getHex());
+  makeBuilding(x, z, w, h, d, new THREE.Color(r,g,b).getHex());
 });
 
-// ── 강북 빌딩군 (북쪽 - 도로 뒤, 300~700m) ──
+// ── 강북 빌딩군 (X 음수 = 강 남쪽 뒤) ──
 const buildingsN = [
-  [-500,-330,18,42,18],[-380,-320,22,58,20],[-250,-335,20,35,18],[-120,-325,25,52,22],
-  [10,-335,18,45,18],[130,-322,22,62,20],[250,-338,20,40,18],[380,-326,24,55,22],
-  [510,-335,18,47,18],[640,-322,20,42,18],[-630,-328,16,34,16],[760,-334,16,38,16],
-  [-460,-475,20,65,20],[-320,-462,24,82,22],[-180,-478,22,55,20],[-40,-466,26,72,24],
-  [100,-478,20,60,20],[240,-464,24,78,22],[380,-478,22,65,20],[520,-466,20,70,20],
-  [660,-478,18,52,18],[-590,-470,16,48,16],[780,-476,16,50,16],
-  [-500,-618,22,88,20],[-355,-605,26,108,24],[-210,-620,24,75,22],[-65,-608,28,92,26],
-  [80,-620,22,82,20],[225,-606,26,102,24],[370,-620,24,85,22],[515,-608,22,90,20],
-  [660,-620,20,72,20],[-640,-612,18,62,18],[780,-618,18,68,18],
+  [-310,-500,18,42,18],[-310,-380,22,58,20],[-310,-250,20,35,18],[-310,-120,25,52,22],
+  [-310,  10,18,45,18],[-310, 130,22,62,20],[-310, 250,20,40,18],[-310, 380,24,55,22],
+  [-310, 510,18,47,18],[-310, 640,20,42,18],[-310,-630,16,34,16],[-310, 760,16,38,16],
+  [-460,-460,20,65,20],[-460,-320,24,82,22],[-460,-180,22,55,20],[-460, -40,26,72,24],
+  [-460, 100,20,60,20],[-460, 240,24,78,22],[-460, 380,22,65,20],[-460, 520,20,70,20],
+  [-460, 660,18,52,18],[-460,-590,16,48,16],[-460, 780,16,50,16],
+  [-600,-500,22,88,20],[-600,-355,26,108,24],[-600,-210,24,75,22],[-600, -65,28,92,26],
+  [-600,  80,22,82,20],[-600, 225,26,102,24],[-600, 370,24,85,22],[-600, 515,22,90,20],
+  [-600, 660,20,72,20],[-600,-640,18,62,18],[-600, 780,18,68,18],
 ];
 buildingsN.forEach(([x,z,w,h,d]) => {
   const r = 0.50+Math.random()*0.15, g = r+0.01, b = r+0.04;
-  makeBuilding(x,z,w,h,d,new THREE.Color(r,g,b).getHex());
+  makeBuilding(x, z, w, h, d, new THREE.Color(r,g,b).getHex());
 });
 
-// ── 산 능선 (빌딩 뒤) ──
+// ── 산 능선 ──
 (function addMountains() {
-  function makeMountainRange(zPos, peaks, color, opacity=1.0) {
+  function makeMountainRange(xPos, peaks, color, opacity=1.0) {
     const segs = 100;
     const geo = new THREE.PlaneGeometry(5000, 600, segs, 12);
     const pos = geo.attributes.position;
     for (let j = 0; j <= 12; j++) {
       for (let i = 0; i <= segs; i++) {
         const idx = j * (segs+1) + i;
-        const x = pos.getX(idx);
+        const z = pos.getZ(idx);  // PlaneGeometry의 Z (회전 전)
         let h = 0;
-        peaks.forEach(([px, ph, pw]) => {
-          h += ph * Math.exp(-Math.pow((x - px) / pw, 2));
+        peaks.forEach(([pz, ph, pw]) => {
+          h += ph * Math.exp(-Math.pow((z - pz) / pw, 2));
         });
         h *= (j / 12) * 0.85 + 0.15;
-        pos.setZ(idx, h);
+        pos.setY(idx, h);
       }
     }
     geo.computeVertexNormals();
@@ -642,54 +647,57 @@ buildingsN.forEach(([x,z,w,h,d]) => {
       transparent: opacity < 1.0, opacity,
     });
     const m = new THREE.Mesh(geo, mat);
+    // PlaneGeometry는 XY 평면 → XZ 평면으로 세우기
     m.rotation.x = -Math.PI / 2;
-    m.position.set(0, 0, zPos);
-    scene.add(m);
+    m.position.set(xPos, 0, 0);
+    envGroup.add(m);
   }
 
-  // 강남 뒤 (남쪽)
-  makeMountainRange(820,  [[-1500,80,400],[-700,110,350],[0,130,380],[600,115,340],[1400,90,400]], 0x4A7A3A);
-  makeMountainRange(1100, [[-1600,140,500],[-500,180,450],[200,200,480],[900,165,420],[1700,145,480]], 0x3A6A2A);
-  makeMountainRange(1500, [[-1800,200,600],[-400,250,550],[300,280,580],[1100,230,520],[2000,190,580]], 0x8AAA78, 0.75);
-
-  // 강북 뒤 (북쪽)
-  makeMountainRange(-800,  [[-1500,75,400],[-600,105,350],[100,125,370],[700,110,340],[1500,85,400]], 0x4A7A3A);
+  // 강 북쪽 (x 양수 방향) 산
+  makeMountainRange( 820,  [[-1500,80,400],[-700,110,350],[0,130,380],[600,115,340],[1400,90,400]], 0x4A7A3A);
+  makeMountainRange(1100,  [[-1600,140,500],[-500,180,450],[200,200,480],[900,165,420],[1700,145,480]], 0x3A6A2A);
+  makeMountainRange(1500,  [[-1800,200,600],[-400,250,550],[300,280,580],[1100,230,520],[2000,190,580]], 0x8AAA78, 0.75);
+  // 강 남쪽 (x 음수 방향) 산
+  makeMountainRange(-820,  [[-1500,75,400],[-600,105,350],[100,125,370],[700,110,340],[1500,85,400]], 0x4A7A3A);
   makeMountainRange(-1080, [[-1600,135,500],[-400,175,450],[300,195,470],[1000,160,420],[1800,140,470]], 0x3A6A2A);
   makeMountainRange(-1480, [[-1800,195,600],[-300,245,550],[400,275,570],[1200,225,520],[2100,185,570]], 0x8AAA78, 0.75);
 })();
-// ══════════════════════════════════════════════
 
+// ══════════════════════════════════════════════
+// 배경 회전 / 수위 제어 (콘솔에서 직접 사용)
+// ══════════════════════════════════════════════
+let envRotationDeg = 0;
+function updateEnvRotation(val) {
+  envRotationDeg = parseFloat(val);
+  envGroup.rotation.y = THREE.MathUtils.degToRad(envRotationDeg);
+}
+function updateSeaY(val) {
+  seaMesh.position.y = parseFloat(val);
+}
+
+// ══════════════════════════════════════════════
+// 브릿지 모델 로드
+// ══════════════════════════════════════════════
 const bridgeGroup = new THREE.Group();
 scene.add(bridgeGroup);
 let modelLoaded = false, deckMesh = null;
 
 const loader = new THREE.GLTFLoader();
-
 loader.load(GLB_PATH,
   function(gltf) {
     const model = gltf.scene;
     model.traverse(child => {
       if (!child.isMesh) return;
       child.castShadow = child.receiveShadow = true;
-
-      // 등급 색상 적용 (mesh 이름 = GlobalId)
       const grade = memberGrades[child.name];
       if (grade && GRADE_COLORS[grade]) {
         child.material = new THREE.MeshStandardMaterial({
-          color: GRADE_COLORS[grade],
-          emissive: GRADE_COLORS[grade],
-          emissiveIntensity: 0.4,
-          roughness: 0.6,
-          metalness: 0.1,
+          color: GRADE_COLORS[grade], emissive: GRADE_COLORS[grade],
+          emissiveIntensity: 0.4, roughness: 0.6, metalness: 0.1,
         });
       } else {
-        child.material = new THREE.MeshStandardMaterial({
-          color: 0x888888,
-          roughness: 0.7,
-          metalness: 0.0,
-        });
+        child.material = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7, metalness: 0.0 });
       }
-
       if (!deckMesh) deckMesh = child;
       else {
         const cs = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
@@ -697,19 +705,30 @@ loader.load(GLB_PATH,
         if (cs.x > bs.x) deckMesh = child;
       }
     });
+
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     console.log(`[모델] 크기: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)}`);
     model.position.sub(center);
     bridgeGroup.add(model);
+
+    // 모델 로드 후: 강/둔치/도로 스케일을 모델 크기에 맞게 조정
+    const bridgeLen = Math.max(size.x, size.z); // 모델의 긴 축
+    const bridgeHalfH = size.y / 2;
+
+    // envGroup 내 요소들의 스케일 재조정
+    // 모델 길이(bridgeLen) 기준으로 강/도로 폭 결정
+    const envScale = bridgeLen / 750; // 750은 기준 모델 길이
+    envGroup.scale.set(envScale, 1, envScale);
+
+    // seaMesh Y는 모델 바닥에 맞춤 (초기값 0, 슬라이더로 조정)
+    seaMesh.position.y = 0;
+
     panX = 0; panY = 0; panZ = 0;
-    seaMesh.position.y = -size.y/2 - 2;
-    seaMesh.position.x = 0;
-    seaMesh.position.z = 0;
     const maxDim = Math.max(size.x, size.y, size.z);
     radius = maxDim * 1.8;
-    camera.far = maxDim*50; camera.near = maxDim*0.0005;
+    camera.far = maxDim * 50; camera.near = maxDim * 0.0005;
     camera.updateProjectionMatrix();
     updateSensorScale(size);
     document.getElementById('loading-overlay').style.display = 'none';
@@ -730,14 +749,13 @@ loader.load(GLB_PATH,
   }
 );
 
+// ── 센서 마커 ──
 const markerMeshes = {}, markerGroup = new THREE.Group();
 scene.add(markerGroup);
 
-// 상태별 색상
 const STATUS_COLORS = { safe: 0x30C080, warn: 0xF0A030, danger: 0xE84040 };
 const STATUS_HEX    = { safe: '#30C080', warn: '#F0A030', danger: '#E84040' };
 
-// Canvas 텍스트로 Sprite 라벨 생성
 function makeLabelSprite(text, color) {
   const canvas2d = document.createElement('canvas');
   canvas2d.width = 512; canvas2d.height = 128;
@@ -745,8 +763,7 @@ function makeLabelSprite(text, color) {
   ctx.clearRect(0, 0, 512, 128);
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 36px IBM Plex Mono, monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, 256, 64);
   const tex = new THREE.CanvasTexture(canvas2d);
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -768,8 +785,6 @@ SENSORS.forEach(s => {
   mesh.userData.sensorId = s.id;
   markerGroup.add(mesh);
   markerMeshes[s.id] = mesh;
-
-  // 펄스 링
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(1.0, 1.3, 16),
     new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.5 })
@@ -777,8 +792,6 @@ SENSORS.forEach(s => {
   ring.rotation.x = -Math.PI / 2;
   ring.userData.isRing = true;
   mesh.add(ring);
-
-  // Sprite 라벨
   const sprite = makeLabelSprite(s.id, STATUS_HEX[status]);
   sprite.position.set(0, 2.5, 0);
   mesh.add(sprite);
@@ -790,7 +803,7 @@ function updateSensorScale(modelSize) {
   markerGroup.position.y = 0;
 }
 
-// 카메라 컨트롤
+// ── 카메라 컨트롤 ──
 let isDragging=false, prevX=0, prevY=0;
 let theta=-Math.PI/8, phi=Math.PI/3.5, radius=1200;
 let panX=0, panY=0, panZ=0;
@@ -850,6 +863,7 @@ function updateScale(v) {
   document.getElementById('footer-scale').textContent=v;
 }
 
+// ── 팝업 ──
 let popupSensorId=null;
 function setPeriod(period) {
   currentPeriod=period;
@@ -864,8 +878,7 @@ function openPopup(id) {
   document.getElementById('popup-title').textContent = id + ' — ' + sensor.type;
   const popup = document.getElementById('graph-popup');
   if (!popup.dataset.positioned) {
-    popup.style.left = '50%';
-    popup.style.top  = '50%';
+    popup.style.left = '50%'; popup.style.top = '50%';
     popup.style.transform = 'translate(-50%, -50%)';
   }
   popup.classList.add('show');
@@ -880,12 +893,10 @@ function closePopup() {
   popupSensorId = null;
 }
 
-// 팝업 드래그 이동
 (function() {
   const popup  = document.getElementById('graph-popup');
   const header = document.querySelector('.popup-header');
   let dragging = false, startX, startY, origLeft, origTop;
-
   header.addEventListener('mousedown', e => {
     if (e.target.classList.contains('popup-close')) return;
     dragging = true;
@@ -895,25 +906,18 @@ function closePopup() {
     popup.style.top  = (rect.top  - wrapRect.top)  + 'px';
     popup.style.transform = 'none';
     popup.dataset.positioned = 'true';
-    startX   = e.clientX;
-    startY   = e.clientY;
-    origLeft = parseFloat(popup.style.left);
-    origTop  = parseFloat(popup.style.top);
-    popup.classList.add('dragging');
-    e.preventDefault();
+    startX   = e.clientX; startY   = e.clientY;
+    origLeft = parseFloat(popup.style.left); origTop  = parseFloat(popup.style.top);
+    popup.classList.add('dragging'); e.preventDefault();
   });
-
   window.addEventListener('mousemove', e => {
     if (!dragging) return;
     popup.style.left = (origLeft + e.clientX - startX) + 'px';
     popup.style.top  = (origTop  + e.clientY - startY) + 'px';
   });
-
-  window.addEventListener('mouseup', () => {
-    dragging = false;
-    popup.classList.remove('dragging');
-  });
+  window.addEventListener('mouseup', () => { dragging = false; popup.classList.remove('dragging'); });
 })();
+
 function drawGraphPopup(id) {
   const sensor=SENSORS.find(s=>s.id===id);
   const series=getSensorSeries(id,currentPeriod);
@@ -947,6 +951,7 @@ function drawGraphPopup(id) {
   }
 }
 
+// ── 사이드 패널 ──
 const typeGroups = {
   '신축변위계':SENSORS.filter(s=>s.type==='신축변위계'),
   '경사계':    SENSORS.filter(s=>s.type==='경사계'),
@@ -982,10 +987,12 @@ function switchTab(el,tab) {
   document.getElementById('tab-info').style.display=tab==='info'?'block':'none';
 }
 
+// ── 시계 ──
 setInterval(()=>{document.getElementById('time-display').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});},1000);
 document.getElementById('time-display').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});
 setInterval(()=>{ if(popupSensorId)drawGraphPopup(popupSensorId); },60000);
 
+// ── 애니메이션 루프 ──
 let t=0;
 function animate() {
   requestAnimationFrame(animate);
@@ -995,7 +1002,8 @@ function animate() {
   camera.position.y=ty+Math.sin(phi)*radius;
   camera.position.z=tz+Math.cos(theta)*Math.cos(phi)*radius;
   camera.lookAt(tx,ty,tz);
-  // 한강 파도 애니메이션 (맑은 낮)
+
+  // 한강 파도 애니메이션
   for(let i=0;i<seaPositions.count;i++){
     const x=seaPositions.getX(i), z=seaPositions.getZ(i);
     seaPositions.setY(i, seaOriginZ[i]
@@ -1004,7 +1012,15 @@ function animate() {
       + Math.sin((x+z)*0.005+t*0.6)*0.3);
   }
   seaPositions.needsUpdate=true; seaGeo.computeVertexNormals();
-  if(deformOn&&modelLoaded){const em=currentVal('EM_P39P40_01'),deform=(em/1000)*deformScale;bridgeGroup.position.y=deform*0.3*Math.sin(t*0.5);bridgeGroup.rotation.x=deform*0.005*Math.cos(t*0.4);}
+
+  // 변형 애니메이션
+  if(deformOn&&modelLoaded){
+    const em=currentVal('EM_P39P40_01'),deform=(em/1000)*deformScale;
+    bridgeGroup.position.y=deform*0.3*Math.sin(t*0.5);
+    bridgeGroup.rotation.x=deform*0.005*Math.cos(t*0.4);
+  }
+
+  // 마커 애니메이션
   markerGroup.children.forEach(m=>{
     if(m.userData.isRing){m.scale.setScalar(1+Math.sin(t*2+m.position.x*0.1)*0.2);m.material.opacity=0.2+Math.sin(t*2+m.position.x*0.1)*0.15;}
     else if(m.userData.sensorId){
@@ -1019,17 +1035,18 @@ function animate() {
           if(child.userData.isRing) child.material.color.setHex(col);
           if(child.userData.isLabel) {
             const scale = Math.max(0.3, Math.min(1.0, 800 / radius));
-            child.scale.set(8 * scale, 2 * scale, 1);
-            child.material.opacity = radius > 600 ? Math.max(0, 1 - (radius - 600) / 400) : 1;
+            child.scale.set(8*scale, 2*scale, 1);
+            child.material.opacity = radius > 600 ? Math.max(0, 1-(radius-600)/400) : 1;
           }
         });
       }
     }
   });
+
   const W=wrap.clientWidth,H=wrap.clientHeight;
   if(renderer.domElement.width!==W||renderer.domElement.height!==H){
     renderer.setSize(W,H,false);
-    camera.aspect=W/H;camera.updateProjectionMatrix();
+    camera.aspect=W/H; camera.updateProjectionMatrix();
   }
   renderer.render(scene,camera);
 }
@@ -1040,9 +1057,85 @@ camera.updateProjectionMatrix();
 renderPanel();
 animate();
 
-window.moveMarker=(id,x,y,z)=>{const m=markerMeshes[id];if(m){m.position.set(x,y,z);console.log(`${id} → (${x},${y},${z})`);} };
-window.listMarkers=()=>SENSORS.forEach(s=>{const m=markerMeshes[s.id];if(m)console.log(`${s.id}: ${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}`);});
-window.showAllMarkers=()=>SENSORS.forEach(s=>{const m=markerMeshes[s.id];if(m)console.log(`{ id:'${s.id}', pos:[${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}] },`);});
+// ══════════════════════════════════════════════
+// 콘솔 제어 API  (F12 → Console 탭에서 사용)
+// ══════════════════════════════════════════════
+
+// ── 배경 회전 ──
+// setEnvRot(각도)  예) setEnvRot(90)   → 배경을 90도 회전
+window.setEnvRot = (deg) => {
+  updateEnvRotation(deg);
+  console.log(`[envGroup] 회전 → ${deg}°`);
+};
+// rotEnv(증분)     예) rotEnv(5)       → 현재에서 5도 추가 회전
+window.rotEnv = (delta) => {
+  updateEnvRotation(envRotationDeg + delta);
+  console.log(`[envGroup] 회전 → ${envRotationDeg}°`);
+};
+
+// ── 강 수위 ──
+// setSeaY(값)      예) setSeaY(-5)     → 강 수면을 -5로 이동
+window.setSeaY = (y) => {
+  updateSeaY(y);
+  console.log(`[seaMesh] position.y → ${y}`);
+};
+
+// ── envGroup 전체 위치 ──
+// setEnvPos(x, y, z)  예) setEnvPos(0, -3, 10) → 배경 위치 이동
+window.setEnvPos = (x, y, z) => {
+  envGroup.position.set(x, y, z);
+  console.log(`[envGroup] position → (${x}, ${y}, ${z})`);
+};
+
+// ── envGroup 스케일 ──
+// setEnvScale(s)   예) setEnvScale(1.2)
+window.setEnvScale = (s) => {
+  envGroup.scale.setScalar(s);
+  console.log(`[envGroup] scale → ${s}`);
+};
+
+// ── 상태 확인 ──
+// envInfo()        → 현재 envGroup 상태 출력
+window.envInfo = () => {
+  console.log(`[envGroup]
+  rotation.y : ${THREE.MathUtils.radToDeg(envGroup.rotation.y).toFixed(1)}°
+  position   : (${envGroup.position.x.toFixed(1)}, ${envGroup.position.y.toFixed(1)}, ${envGroup.position.z.toFixed(1)})
+  scale      : ${envGroup.scale.x.toFixed(3)}
+  seaMesh.y  : ${seaMesh.position.y.toFixed(2)}`);
+};
+
+// ── 센서 마커 위치 ──
+window.moveMarker = (id,x,y,z) => { const m=markerMeshes[id]; if(m){m.position.set(x,y,z);console.log(`${id} → (${x},${y},${z})`);} };
+window.listMarkers = () => SENSORS.forEach(s=>{ const m=markerMeshes[s.id]; if(m)console.log(`${s.id}: ${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}`); });
+window.showAllMarkers = () => SENSORS.forEach(s=>{ const m=markerMeshes[s.id]; if(m)console.log(`{ id:'${s.id}', pos:[${m.position.x.toFixed(1)}, ${m.position.y.toFixed(1)}, ${m.position.z.toFixed(1)}] },`); });
+
+// ── 도움말 ──
+window.help = () => console.log(`
+╔════════════════════════════════════════╗
+║   청담대교 Digital Twin — 콘솔 API     ║
+╠════════════════════════════════════════╣
+║  배경 회전                             ║
+║   setEnvRot(90)     절대값 회전 (도)   ║
+║   rotEnv(5)         상대값 회전 (도)   ║
+║                                        ║
+║  강 수위                               ║
+║   setSeaY(-5)       수면 Y 위치 지정   ║
+║                                        ║
+║  배경 위치 / 스케일                    ║
+║   setEnvPos(0,0,10) 배경 위치 이동     ║
+║   setEnvScale(1.2)  배경 전체 스케일   ║
+║                                        ║
+║  상태 확인                             ║
+║   envInfo()         현재 값 출력       ║
+║                                        ║
+║  센서 마커                             ║
+║   listMarkers()     마커 위치 목록     ║
+║   moveMarker(id,x,y,z)  마커 이동      ║
+╚════════════════════════════════════════╝
+`);
+
+console.log('%c청담대교 Digital Twin 로드 완료. help() 를 입력하면 콘솔 명령어 목록이 표시됩니다.', 'color:#00E5CC;font-weight:bold;');
+
 
 </script>
 </body>
