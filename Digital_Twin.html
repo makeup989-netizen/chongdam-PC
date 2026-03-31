@@ -1076,10 +1076,17 @@ window.rotEnv = (delta) => {
 };
 
 // ── 강 수위 ──
-// setSeaY(값)      예) setSeaY(-5)     → 강 수면을 -5로 이동
 window.setSeaY = (y) => {
   updateSeaY(y);
   console.log(`[seaMesh] position.y → ${y}`);
+};
+
+// ── 강 폭 ──
+// setRiverWidth(배율)  기본값 1.0 = 원래 폭(RIVER_L=300)
+// 예) setRiverWidth(2.0) → 폭 2배,  setRiverWidth(0.5) → 절반
+window.setRiverWidth = (scale) => {
+  seaMesh.scale.z = parseFloat(scale);
+  console.log(`[seaMesh] 강 폭 배율 → ${scale}× (기준 ${RIVER_L})`);
 };
 
 // ── envGroup 전체 위치 ──
@@ -1100,10 +1107,11 @@ window.setEnvScale = (s) => {
 // envInfo()        → 현재 envGroup 상태 출력
 window.envInfo = () => {
   console.log(`[envGroup]
-  rotation.y : ${THREE.MathUtils.radToDeg(envGroup.rotation.y).toFixed(1)}°
-  position   : (${envGroup.position.x.toFixed(1)}, ${envGroup.position.y.toFixed(1)}, ${envGroup.position.z.toFixed(1)})
-  scale      : ${envGroup.scale.x.toFixed(3)}
-  seaMesh.y  : ${seaMesh.position.y.toFixed(2)}`);
+  rotation.y    : ${THREE.MathUtils.radToDeg(envGroup.rotation.y).toFixed(1)}°
+  position      : (${envGroup.position.x.toFixed(1)}, ${envGroup.position.y.toFixed(1)}, ${envGroup.position.z.toFixed(1)})
+  scale         : ${envGroup.scale.x.toFixed(3)}
+  seaMesh.y     : ${seaMesh.position.y.toFixed(2)}
+  riverWidth ×  : ${seaMesh.scale.z.toFixed(2)}`);
 };
 
 // ── 센서 마커 위치 ──
@@ -1117,11 +1125,13 @@ window.help = () => console.log(`
 ║   청담대교 Digital Twin — 콘솔 API     ║
 ╠════════════════════════════════════════╣
 ║  배경 회전                             ║
-║   setEnvRot(90)     절대값 회전 (도)   ║
+║   setEnvRot(160.5)  절대값 회전 (도)   ║
 ║   rotEnv(5)         상대값 회전 (도)   ║
 ║                                        ║
-║  강 수위                               ║
+║  강 수위 / 폭                          ║
 ║   setSeaY(-5)       수면 Y 위치 지정   ║
+║   setRiverWidth(2)  강 폭 배율 조정    ║
+║                     (기본값 1.0)        ║
 ║                                        ║
 ║  배경 위치 / 스케일                    ║
 ║   setEnvPos(0,0,10) 배경 위치 이동     ║
