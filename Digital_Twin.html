@@ -736,7 +736,7 @@ function seededRand(seed) {
   return x - Math.floor(x);
 }
 
-// ── 랜덤 간격 도시 배치 (간격 0~120 랜덤) ──
+// ── 랜덤 분포 도시 배치 (1/3 밀도) ──
 function seededRand(seed) {
   const x = Math.sin(seed) * 43758.5453123;
   return x - Math.floor(x);
@@ -744,7 +744,7 @@ function seededRand(seed) {
 
 function fillCityRandom(group, sign, seedBase) {
   const xStart = -4000, xEnd = 4000;
-  const zStart = 0,     zEnd = 3500;
+  const zStart = 0,     zEnd = 2200;  // 강 주변 2200 범위
   const MIN_GAP = 5, MAX_GAP = 120;
 
   let si = 0;
@@ -753,6 +753,14 @@ function fillCityRandom(group, sign, seedBase) {
     let curZ = zStart;
     while (curZ < zEnd) {
       const s = seedBase + si++;
+
+      // 53% × 1.5 = 약 80% 확률로 건물 생성
+      if (seededRand(s*3+0) > 0.8) {
+        const skipZ = MIN_GAP + seededRand(s*3+10) * (MAX_GAP - MIN_GAP);
+        curZ += 18 + seededRand(s*3+4) * 20 + skipZ;
+        continue;
+      }
+
       const w = 18 + seededRand(s*3+3) * 22;
       const d = 18 + seededRand(s*3+4) * 20;
       const h = 15 + seededRand(s*3+5) * 140;
@@ -772,14 +780,12 @@ function fillCityRandom(group, sign, seedBase) {
       spawnBuilding(group, x, z, w, finalH, d,
         new THREE.Color(r, gg, b).getHex(), typeIdx);
 
-      // z 다음 위치: 건물 깊이 + 랜덤 간격
       const gapZ = MIN_GAP + seededRand(s*3+10) * (MAX_GAP - MIN_GAP);
       curZ += d + gapZ;
     }
-    // x 다음 위치: 건물 폭 + 랜덤 간격
     const sRow = seedBase + si++;
-    const gapX = MIN_GAP + seededRand(sRow * 7 + 1) * (MAX_GAP - MIN_GAP);
-    curX += (18 + seededRand(sRow * 7 + 2) * 22) + gapX;
+    const gapX = MIN_GAP + seededRand(sRow*7+1) * (MAX_GAP - MIN_GAP);
+    curX += (18 + seededRand(sRow*7+2) * 22) + gapX;
   }
 }
 
@@ -856,6 +862,7 @@ loader.load(GLB_PATH,
     seaMesh.position.y = 0;
 
     panX = 0; panY = 0; panZ = 0;
+    bridgeGroup.position.y = 15.5;  // 모델 로드 후 Y 오프셋 재적용
     const maxDim = Math.max(size.x, size.y, size.z);
     radius = maxDim * 1.8;
     camera.far = maxDim * 50; camera.near = maxDim * 0.0005;
@@ -1143,10 +1150,10 @@ function animate() {
   }
   seaPositions.needsUpdate=true; seaGeo.computeVertexNormals();
 
-  // 변형 애니메이션
+  // 변형 애니메이션 (15.5 기준 오프셋 위에서 진동)
   if(deformOn&&modelLoaded){
     const em=currentVal('EM_P39P40_01'),deform=(em/1000)*deformScale;
-    bridgeGroup.position.y=deform*0.3*Math.sin(t*0.5);
+    bridgeGroup.position.y=15.5+deform*0.3*Math.sin(t*0.5);
     bridgeGroup.rotation.x=deform*0.005*Math.cos(t*0.4);
   }
 
