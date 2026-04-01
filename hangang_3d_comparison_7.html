@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>한강철교 PyNite + OpenSeesPy 3D 비교 FEM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&family=Noto+Sans+KR:wght@400;600&display=swap');
+:root{
+  --bg:#07090f;--surf:#0d1018;--panel:#10141e;--bdr:#1a2235;--bdr2:#222d42;
+  --text:#b8cce0;--dim:#4a5e78;--acc:#3b82f6;
+  --fs-xxs:12px;--fs-xs:13.5px;--fs-sm:14.25px;--fs-md:15px;--fs-lg:16.5px;--fs-xl:18px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Noto Sans KR',sans-serif;font-size:var(--fs-md);}
+.shell{display:flex;flex-direction:column;height:100vh;}
+.hdr{display:flex;align-items:center;gap:8px;background:var(--surf);border-bottom:1px solid var(--bdr2);padding:7px 14px;flex-shrink:0;}
+.htitle h1{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-md);font-weight:700;color:#7fc8ff;}
+.htitle p{font-size:var(--fs-xxs);color:var(--dim);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.specs{display:flex;gap:14px;margin-left:auto;}
+.sp{text-align:center;}
+.sv{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xl);font-weight:700;color:#f0c040;line-height:1;}
+.sl{font-size:var(--fs-xxs);color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.vtabs{display:flex;gap:3px;}
+.vt{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-md);background:var(--bdr);border:1px solid var(--bdr2);color:var(--dim);padding:4px 10px;border-radius:3px;cursor:pointer;}
+.vt:hover,.vt.on{background:var(--acc);border-color:var(--acc);color:#fff;}
+/* 소스 토글 */
+.src-wrap{display:flex;align-items:center;gap:5px;background:#080c14;border:1px solid var(--bdr2);border-radius:5px;padding:4px 8px;}
+.src-lbl{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xxs);color:var(--dim);}
+.src-btn{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xs);font-weight:700;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid transparent;transition:all .18s;}
+.src-btn.py{background:#0a1f3a;border-color:#3b82f6;color:#60a5fa;}
+.src-btn.py.on{background:#1a3f7a;border-color:#7fc8ff;color:#fff;box-shadow:0 0 8px #3b82f6aa;}
+.src-btn.ops{background:#0a2a1a;border-color:#10b981;color:#34d399;}
+.src-btn.ops.on{background:#0f3d27;border-color:#34d399;color:#fff;box-shadow:0 0 8px #10b98188;}
+.body{display:flex;flex:1;overflow:hidden;}
+.sb{width:248px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--bdr2);overflow-y:auto;padding:7px;display:flex;flex-direction:column;gap:6px;}
+.sb::-webkit-scrollbar{width:3px;}
+.sb::-webkit-scrollbar-thumb{background:#1e2d45;border-radius:2px;}
+.sec h4{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xxs);font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.14em;border-bottom:1px solid var(--bdr);padding-bottom:3px;margin-bottom:5px;}
+.kv{background:var(--panel);border:1px solid var(--bdr);border-radius:4px;overflow:hidden;}
+.kr{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;border-bottom:1px solid var(--bdr);}
+.kr:last-child{border-bottom:none;}
+.kk{font-size:var(--fs-xs);color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+.kv2{font-size:var(--fs-sm);font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.lcb{background:var(--bdr);border:1px solid var(--bdr2);color:var(--dim);padding:5px 4px;border-radius:3px;font-size:var(--fs-xs);cursor:pointer;font-family:'IBM Plex Mono',monospace;text-align:center;transition:all .15s;}
+.lcb:hover{border-color:#60a5fa;color:#7fc8ff;}
+.lcb.on{background:#0a1f3a;border-color:#60a5fa;color:#60a5fa;}
+.fc{background:var(--panel);border:1px solid var(--bdr2);border-radius:4px;padding:6px;}
+.sl2{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.sl2 span{font-size:var(--fs-xs);color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+.sl2 b{font-size:var(--fs-md);color:#7fc8ff;font-family:'IBM Plex Mono',monospace;}
+input[type=range]{width:100%;accent-color:var(--acc);height:4px;cursor:pointer;}
+.gw{height:8px;background:var(--bdr);border-radius:5px;overflow:hidden;margin:3px 0;}
+.gf{height:100%;border-radius:5px;transition:width .3s;}
+.cv{flex:1;position:relative;overflow:hidden;}
+canvas#c{display:block;width:100%;height:100%;}
+.btns{display:flex;flex-direction:column;gap:3px;}
+.tb{background:var(--panel);border:1px solid var(--bdr2);color:var(--text);padding:5px 7px;border-radius:4px;font-size:var(--fs-xs);cursor:pointer;text-align:left;display:flex;align-items:center;gap:5px;}
+.tb:hover{border-color:var(--acc);color:#fff;}
+.tb.on{background:#0f1f3a;border-color:var(--acc);color:#7fc8ff;}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+/* 비교표 */
+.cmp{background:var(--panel);border:1px solid #1e3a6a;border-radius:4px;padding:6px 7px;}
+.cmp-hdr{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);border-bottom:1px solid var(--bdr);padding-bottom:3px;margin-bottom:4px;display:flex;justify-content:space-between;}
+.cmp-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.cmp-row:last-child{border-bottom:none;}
+.cmp-lbl{font-size:11px;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+.cmp-py{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#60a5fa;font-weight:700;}
+.cmp-ops{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#34d399;font-weight:700;}
+.cmp-diff{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#a78bfa;}
+.rx-t{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xxs);}
+.rx-t th,.rx-t td{padding:3px 4px;border-bottom:1px solid var(--bdr);}
+.rx-t th{color:var(--dim);text-align:right;}
+.rx-t th:first-child,.rx-t td:first-child{text-align:left;}
+.rx-t td{text-align:right;}
+.rx-t td:first-child{color:#7fc8ff;}
+.foot{background:var(--surf);border-top:1px solid var(--bdr2);display:flex;align-items:center;gap:12px;padding:4px 14px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:var(--fs-md);color:var(--dim);}
+.pulse{width:8px;height:8px;border-radius:50%;background:#2ecc71;box-shadow:0 0 6px #2ecc71;animation:blink 2s infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.fv{color:#5ba4d4;}
+.hint{margin-left:auto;color:#1e2d3a;}
+#modebox{position:absolute;top:10px;right:10px;background:rgba(10,16,28,.92);border:1px solid var(--bdr2);border-radius:5px;padding:8px;display:none;}
+#modebox .mt{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xs);color:var(--dim);margin-bottom:4px;}
+/* 활성 소스 표시 배너 */
+.src-banner{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--bdr2);border-radius:4px;padding:4px 7px;}
+.src-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.src-name{font-family:'IBM Plex Mono',monospace;font-size:var(--fs-xs);font-weight:700;}
+.src-desc{font-size:10px;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="hdr">
+  <div class="htitle">
+    <h1>한강철교 P21→P24 Warren Truss 3경간 &nbsp;│&nbsp; 3D FEM 비교해석</h1>
+    <p>PyNite 3D (절점168, 부재552) &nbsp;vs&nbsp; OpenSeesPy 3D (동일 토폴로지) &nbsp;│&nbsp; 정적/고유치/이동하중/부등침하</p>
+  </div>
+  <div class="specs">
+    <div class="sp"><div class="sv">188.2m</div><div class="sl">총연장</div></div>
+    <div class="sp"><div class="sv" id="sv-d" style="color:#00ffe0">—</div><div class="sl">최대처짐</div></div>
+    <div class="sp"><div class="sv" id="sv-r" style="color:#34d399">—</div><div class="sl">허용비</div></div>
+    <div class="sp"><div class="sv" id="sv-f" style="color:#f0c040">—</div><div class="sl">1차주파수</div></div>
+  </div>
+  <!-- 결과소스 토글 -->
+  <div class="src-wrap">
+    <span class="src-lbl">결과소스</span>
+    <button class="src-btn py on" id="src-py" onclick="setSRC('pynite')">🔬 PyNite</button>
+    <button class="src-btn ops"   id="src-ops" onclick="setSRC('opensees')">⚙️ OpenSeesPy</button>
+  </div>
+  <div class="vtabs">
+    <button class="vt on" id="vt-persp" onclick="setView('persp')">3D</button>
+    <button class="vt" id="vt-front"    onclick="setView('front')">정면</button>
+    <button class="vt" id="vt-top"      onclick="setView('top')">평면</button>
+    <button class="vt" id="vt-side"     onclick="setView('side')">측면</button>
+  </div>
+</div>
+<div class="body">
+<div class="sb">
+  <!-- 활성 소스 표시 -->
+  <div class="src-banner">
+    <div class="src-dot" id="src-dot" style="background:#60a5fa;box-shadow:0 0 6px #3b82f6"></div>
+    <div>
+      <div class="src-name" id="src-name">PyNite 3D FEM</div>
+      <div class="src-desc" id="src-desc">절점 168 | 부재 552</div>
+    </div>
+  </div>
+  <div class="sec"><h4>해석 모드</h4>
+    <div class="g2">
+      <button class="lcb on" id="am-static"  onclick="setAM('static')">정적해석</button>
+      <button class="lcb"    id="am-eig"     onclick="setAM('eig')">고유치</button>
+      <button class="lcb"    id="am-moving"  onclick="setAM('moving')">이동하중</button>
+      <button class="lcb"    id="am-settle"  onclick="setAM('settle')">부등침하</button>
+    </div>
+  </div>
+  <div id="p-static">
+    <div class="sec"><h4>하중 조건</h4>
+      <div class="g2">
+        <button class="lcb"    id="lc-DL_ONLY" onclick="setLC('DL_ONLY')">자중만</button>
+        <button class="lcb on" id="lc-SER_I"   onclick="setLC('SER_I')">SER-I</button>
+        <button class="lcb"    id="lc-LL_FULL" onclick="setLC('LL_FULL')">LL전경간</button>
+        <button class="lcb"    id="lc-SER_MID" onclick="setLC('SER_MID')">SER중앙</button>
+      </div>
+    </div>
+    <div class="sec"><h4>표시 모드</h4>
+      <div class="g2">
+        <button class="lcb on" id="dm-defl"  onclick="setDM('defl')">처짐</button>
+        <button class="lcb"    id="dm-force" onclick="setDM('force')">부재력</button>
+      </div>
+    </div>
+    <!-- 부재력 범례 (force 모드일 때만 표시) -->
+    <div id="force-legend" style="display:none">
+      <div class="sec"><h4>부재력 범례</h4>
+        <div style="background:var(--panel);border:1px solid var(--bdr2);border-radius:4px;padding:6px 7px;">
+          <canvas id="cv-flegend" width="200" height="22" style="width:200px;height:22px;display:block;border-radius:3px;"></canvas>
+          <div style="display:flex;justify-content:space-between;margin-top:3px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#ff6060" id="leg-mc">—</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888">0</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#60c8ff" id="leg-mt">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:2px;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#f87171">● 압축</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#888">무력</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#60a5fa">● 인장</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec"><h4>해석 결과</h4>
+      <div class="kv">
+        <div class="kr"><span class="kk">δmax</span><span class="kv2" style="color:#00ffe0" id="r-d">—</span></div>
+        <div class="kr"><span class="kk">위치</span><span class="kv2" id="r-x">—</span></div>
+        <div class="kr"><span class="kk">허용(L/1000)</span><span class="kv2" style="color:#34d399">188.2mm</span></div>
+        <div class="kr"><span class="kk">δ/δallow</span><span class="kv2" id="r-rt">—</span></div>
+      </div>
+      <div style="margin-top:4px">
+        <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--dim)">
+          <span>처짐비율</span><span id="r-pct">0%</span></div>
+        <div class="gw"><div class="gf" id="gfill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="sec"><h4>🔬 PyNite  vs  ⚙️ OpenSeesPy 비교</h4>
+      <div class="cmp">
+        <div class="cmp-hdr">
+          <span>항목</span><span style="color:#60a5fa">PyNite</span>
+          <span style="color:#34d399">OpenSeesPy</span><span style="color:#a78bfa">차이</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-lbl">SER-I δmax</span>
+          <span class="cmp-py">14.6mm</span>
+          <span class="cmp-ops">14.7mm</span>
+          <span class="cmp-diff">0.4%</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-lbl">JS 등가보</span>
+          <span class="cmp-py">34.5mm</span>
+          <span class="cmp-ops">—</span><span class="cmp-diff">—</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-lbl">최대압축</span>
+          <span class="cmp-py">-2391kN</span>
+          <span class="cmp-ops">-2391kN</span>
+          <span class="cmp-diff">—</span>
+        </div>
+        <div class="cmp-row">
+          <span class="cmp-lbl">최대인장</span>
+          <span class="cmp-py">1925kN</span>
+          <span class="cmp-ops">1955kN</span>
+          <span class="cmp-diff">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="sec"><h4>지점반력 SER-I (kN) — 현재소스</h4>
+      <table class="rx-t"><thead><tr><th>지점</th><th>RY</th></tr></thead>
+      <tbody id="rx-tbody">—</tbody></table>
+    </div>
+  </div>
+  <div id="p-eig" style="display:none">
+    <div class="sec"><h4>모드 방향</h4>
+      <div class="g2">
+        <button class="lcb on" id="et-V" onclick="setET('V')">수직굽힘</button>
+        <button class="lcb"    id="et-L" onclick="setET('L')">횡방향</button>
+        <button class="lcb"    id="et-T" onclick="setET('T')">비틀림</button>
+      </div>
+    </div>
+    <div class="sec"><h4>모드 차수</h4>
+      <div class="g2">
+        <button class="lcb on" id="em-0" onclick="setEM(0)">1차</button>
+        <button class="lcb"    id="em-1" onclick="setEM(1)">2차</button>
+        <button class="lcb"    id="em-2" onclick="setEM(2)">3차</button>
+        <button class="lcb"    id="em-3" onclick="setEM(3)">4차</button>
+        <button class="lcb"    id="em-4" onclick="setEM(4)">5차</button>
+        <button class="lcb"    id="em-5" onclick="setEM(5)">6차</button>
+      </div>
+    </div>
+    <div class="sec"><h4>고유치 결과</h4>
+      <div class="kv">
+        <div class="kr"><span class="kk">주파수 f</span><span class="kv2" style="color:#f0c040" id="er-f">—</span></div>
+        <div class="kr"><span class="kk">주기 T</span><span class="kv2" style="color:#60a5fa" id="er-T">—</span></div>
+      </div>
+    </div>
+    <div class="sec"><h4>전체 모드표</h4>
+      <table class="rx-t"><thead><tr><th>모드</th><th>f(Hz)</th><th>T(s)</th></tr></thead>
+      <tbody id="eig-tbody"></tbody></table>
+    </div>
+    <div class="sec"><h4>진폭 · 애니메이션</h4>
+      <div class="fc">
+        <div class="sl2"><span>진폭</span><b id="lbl-amp">×8</b></div>
+        <input type="range" id="sl-amp" min="1" max="20" step="1" value="8" oninput="onAmp(this.value)">
+      </div>
+      <button class="lcb on" id="btn-anim" onclick="toggleAnim()" style="width:100%;margin-top:5px">⏸ 정지</button>
+    </div>
+    <div class="sec"><h4>모드형상 프로파일</h4>
+      <canvas id="cv-mode" width="210" height="65" style="width:210px;height:65px"></canvas>
+    </div>
+  </div>
+  <div id="p-moving" style="display:none">
+    <div class="sec"><h4>차량 이동하중</h4>
+      <div class="fc">
+        <div class="sl2"><span>열차 선두 위치</span><b id="lbl-tx">x=-110m</b></div>
+        <input type="range" id="sl-tx" min="-110" max="300" step="1" value="-110" oninput="onTX(this.value)">
+      </div>
+      <button class="lcb on" id="btn-play" onclick="togglePlay()" style="width:100%;margin-top:5px">▶ 자동주행</button>
+      <div class="fc" style="margin-top:4px">
+        <div class="sl2"><span>속도</span><b id="lbl-spd">보통</b></div>
+        <input type="range" id="sl-spd" min="20" max="200" step="20" value="80" oninput="onSpd(this.value)">
+      </div>
+    </div>
+    <div class="sec"><h4>이동하중 결과</h4>
+      <div class="kv">
+        <div class="kr"><span class="kk">현재 δmax</span><span class="kv2" style="color:#00ffe0" id="mv-d">—</span></div>
+        <div class="kr"><span class="kk">최대 δ (이력)</span><span class="kv2" style="color:#f0c040" id="mv-mx">—</span></div>
+        <div class="kr"><span class="kk">열차 위치</span><span class="kv2" id="mv-pos">—</span></div>
+      </div>
+    </div>
+    <div class="sec"><h4>처짐 프로파일</h4>
+      <canvas id="cv-mv" width="210" height="65" style="width:210px;height:65px"></canvas>
+    </div>
+  </div>
+  <div id="p-settle" style="display:none">
+    <div class="sec"><h4>지점 침하량 (mm)</h4>
+      <div style="font-size:var(--fs-xxs);color:var(--dim);font-family:'IBM Plex Mono',monospace;margin-bottom:4px">각 지점 좌측(L)/우측(R) 받침 연직침하</div>
+      <div class="fc"><div class="sl2"><span>P21 L</span><b id="lbl-s0">0mm</b></div>
+        <input type="range" id="sl-s0" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P21 R</span><b id="lbl-s1">0mm</b></div>
+        <input type="range" id="sl-s1" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P22 L</span><b id="lbl-s2">0mm</b></div>
+        <input type="range" id="sl-s2" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P22 R</span><b id="lbl-s3">0mm</b></div>
+        <input type="range" id="sl-s3" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P23 L</span><b id="lbl-s4">0mm</b></div>
+        <input type="range" id="sl-s4" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P23 R</span><b id="lbl-s5">0mm</b></div>
+        <input type="range" id="sl-s5" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P24 L</span><b id="lbl-s6">0mm</b></div>
+        <input type="range" id="sl-s6" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+      <div class="fc" style="margin-top:2px"><div class="sl2"><span>P24 R</span><b id="lbl-s7">0mm</b></div>
+        <input type="range" id="sl-s7" min="0" max="100" step="1" value="0" oninput="onSettle()"></div>
+    </div>
+    <div class="sec"><h4>침하 결과</h4>
+      <div class="kv">
+        <div class="kr"><span class="kk">추가 처짐 δ</span><span class="kv2" style="color:#fb923c" id="st-add">—</span></div>
+        <div class="kr"><span class="kk">SER-I 합산 δ</span><span class="kv2" style="color:#00ffe0" id="st-tot">—</span></div>
+        <div class="kr"><span class="kk">좌우 차이</span><span class="kv2" style="color:#f0c040" id="st-diff">—</span></div>
+      </div>
+    </div>
+    <div class="sec"><h4>침하 처짐 프로파일</h4>
+      <canvas id="cv-settle" width="210" height="65" style="width:210px;height:65px"></canvas>
+    </div>
+  </div>
+  <div class="sec"><h4>레이어</h4>
+    <div class="btns">
+      <button class="tb on" id="btn-ghost"   onclick="tog('ghost')">  <div class="dot" style="background:#3a4a5a"></div>원래형상</button>
+      <button class="tb on" id="btn-deform"  onclick="tog('deform')"> <div class="dot" style="background:#00ffe0"></div>변형형상</button>
+      <button class="tb on" id="btn-truss"   onclick="tog('truss')">  <div class="dot" style="background:#f0c040"></div>트러스</button>
+      <button class="tb on" id="btn-brace"   onclick="tog('brace')">  <div class="dot" style="background:#60a5fa"></div>횡구</button>
+      <button class="tb on" id="btn-floor"   onclick="tog('floor')">  <div class="dot" style="background:#34d399"></div>가로보</button>
+      <button class="tb on" id="btn-support" onclick="tog('support')"><div class="dot" style="background:#f87171"></div>받침</button>
+      <button class="tb on" id="btn-pier"    onclick="tog('pier')">   <div class="dot" style="background:#8899aa"></div>교각</button>
+    </div>
+  </div>
+  <div class="sec"><h4>변형배율</h4>
+    <div class="fc"><div class="sl2"><span>배율</span><b id="lbl-sc">×200</b></div>
+      <input type="range" id="sl-sc" min="10" max="800" step="10" value="200" oninput="onSC(this.value)"></div>
+  </div>
+</div>
+<div class="cv">
+  <canvas id="c"></canvas>
+  <div id="modebox">
+    <div class="mt" id="modebox-title">고유치 전체 모드</div>
+    <canvas id="cv-modes-all" width="280" height="90" style="width:280px;height:90px"></canvas>
+  </div>
+</div>
+</div>
+<div class="foot">
+  <div class="pulse"></div>
+  <span id="ft-src" style="color:#60a5fa;font-weight:700">PyNite 3D</span>
+  <span>절점<span class="fv" id="ft-n">—</span></span>
+  <span>부재<span class="fv" id="ft-m">—</span></span>
+  <span class="fv" id="ft-mode">정적해석</span>
+  <span class="fv" id="ft-lc">SER-I</span>
+  <span class="fv" id="ft-sc">배율×200</span>
+  <span class="hint">드래그:회전 │ 우클릭:이동 │ 휠:줌</span>
+</div>
+</div>
+<script>
+const DATA={"panelX":[0.0,6.8438,13.6875,20.5312,27.375,34.2188,41.0625,47.9062,54.75,61.8864,69.0227,76.1591,83.2955,90.4318,97.5682,104.7045,111.8409,118.9773,126.1136,133.25,140.1188,146.9875,153.8562,160.725,167.5938,174.4625,181.3313,188.2],"NTN":28,"SUP_IDX":[0,8,19,27],"TOT":188.2,"W_TR":9.5,"SPANS":[54.75,78.5,54.95],"VEH_LEN":110.0,"N_MODES":6,"NC":{"TCL0":[0.0,3.5,0.0],"BCL0":[0.0,0.0,0.0],"TCL1":[6.8438,3.249999086764663,0.0],"BCL1":[6.8438,0.0,0.0],"TCL2":[13.6875,3.25,0.0],"BCL2":[13.6875,0.0,0.0],"TCL3":[20.5312,3.499997260280644,0.0],"BCL3":[20.5312,0.0,0.0],"TCL4":[27.375,4.0,0.0],"BCL4":[27.375,0.0,0.0],"TCL5":[34.2188,4.750006392700735,0.0],"BCL5":[34.2188,0.0,0.0],"TCL6":[41.0625,5.75,0.0],"BCL6":[41.0625,0.0,0.0],"TCL7":[47.9062,6.9999899543445725,0.0],"BCL7":[47.9062,0.0,0.0],"TCL8":[54.75,8.5,0.0],"BCL8":[54.75,0.0,0.0],"TCL9":[61.8864,7.342969900513611,0.0],"BCL9":[61.8864,0.0,0.0],"TCL10":[69.0227,6.417358467128079,0.0],"BCL10":[69.0227,0.0,0.0],"TCL11":[76.1591,5.72313975890949,0.0],"BCL11":[76.1591,0.0,0.0],"TCL12":[83.2955,5.260328367641689,0.0],"BCL12":[83.2955,0.0,0.0],"TCL13":[90.4318,5.028925914618849,0.0],"BCL13":[90.4318,0.0,0.0],"TCL14":[97.5682,5.028925914618849,0.0],"BCL14":[97.5682,0.0,0.0],"TCL15":[104.7045,5.260328367641689,0.0],"BCL15":[104.7045,0.0,0.0],"TCL16":[111.8409,5.72313975890949,0.0],"BCL16":[111.8409,0.0,0.0],"TCL17":[118.9773,6.417358467128078,0.0],"BCL17":[118.9773,0.0,0.0],"TCL18":[126.1136,7.342969900513611,0.0],"BCL18":[126.1136,0.0,0.0],"TCL19":[133.25,8.5,0.0],"BCL19":[133.25,0.0,0.0],"TCL20":[140.1188,6.999989990907444,0.0],"BCL20":[140.1188,0.0,0.0],"TCL21":[146.9875,5.749999999999998,0.0],"BCL21":[146.9875,0.0,0.0],"TCL22":[153.8562,4.7500063694333745,0.0],"BCL22":[153.8562,0.0,0.0],"TCL23":[160.725,4.0,0.0],"BCL23":[160.725,0.0,0.0],"TCL24":[167.5938,3.4999972702523023,0.0],"BCL24":[167.5938,0.0,0.0],"TCL25":[174.4625,3.2500000000000004,0.0],"BCL25":[174.4625,0.0,0.0],"TCL26":[181.3313,3.250000909924731,0.0],"BCL26":[181.3313,0.0,0.0],"TCL27":[188.2,3.499999999999999,0.0],"BCL27":[188.2,0.0,0.0],"TCR0":[0.0,3.5,9.5],"BCR0":[0.0,0.0,9.5],"TCR1":[6.8438,3.249999086764663,9.5],"BCR1":[6.8438,0.0,9.5],"TCR2":[13.6875,3.25,9.5],"BCR2":[13.6875,0.0,9.5],"TCR3":[20.5312,3.499997260280644,9.5],"BCR3":[20.5312,0.0,9.5],"TCR4":[27.375,4.0,9.5],"BCR4":[27.375,0.0,9.5],"TCR5":[34.2188,4.750006392700735,9.5],"BCR5":[34.2188,0.0,9.5],"TCR6":[41.0625,5.75,9.5],"BCR6":[41.0625,0.0,9.5],"TCR7":[47.9062,6.9999899543445725,9.5],"BCR7":[47.9062,0.0,9.5],"TCR8":[54.75,8.5,9.5],"BCR8":[54.75,0.0,9.5],"TCR9":[61.8864,7.342969900513611,9.5],"BCR9":[61.8864,0.0,9.5],"TCR10":[69.0227,6.417358467128079,9.5],"BCR10":[69.0227,0.0,9.5],"TCR11":[76.1591,5.72313975890949,9.5],"BCR11":[76.1591,0.0,9.5],"TCR12":[83.2955,5.260328367641689,9.5],"BCR12":[83.2955,0.0,9.5],"TCR13":[90.4318,5.028925914618849,9.5],"BCR13":[90.4318,0.0,9.5],"TCR14":[97.5682,5.028925914618849,9.5],"BCR14":[97.5682,0.0,9.5],"TCR15":[104.7045,5.260328367641689,9.5],"BCR15":[104.7045,0.0,9.5],"TCR16":[111.8409,5.72313975890949,9.5],"BCR16":[111.8409,0.0,9.5],"TCR17":[118.9773,6.417358467128078,9.5],"BCR17":[118.9773,0.0,9.5],"TCR18":[126.1136,7.342969900513611,9.5],"BCR18":[126.1136,0.0,9.5],"TCR19":[133.25,8.5,9.5],"BCR19":[133.25,0.0,9.5],"TCR20":[140.1188,6.999989990907444,9.5],"BCR20":[140.1188,0.0,9.5],"TCR21":[146.9875,5.749999999999998,9.5],"BCR21":[146.9875,0.0,9.5],"TCR22":[153.8562,4.7500063694333745,9.5],"BCR22":[153.8562,0.0,9.5],"TCR23":[160.725,4.0,9.5],"BCR23":[160.725,0.0,9.5],"TCR24":[167.5938,3.4999972702523023,9.5],"BCR24":[167.5938,0.0,9.5],"TCR25":[174.4625,3.2500000000000004,9.5],"BCR25":[174.4625,0.0,9.5],"TCR26":[181.3313,3.250000909924731,9.5],"BCR26":[181.3313,0.0,9.5],"TCR27":[188.2,3.499999999999999,9.5],"BCR27":[188.2,0.0,9.5]},"ML":[["TCL0","TCL1","TC","#f0c040",3.0,"truss"],["BCL0","BCL1","BC","#48d1aa",3.0,"truss"],["TCL1","TCL2","TC","#f0c040",3.0,"truss"],["BCL1","BCL2","BC","#48d1aa",3.0,"truss"],["TCL2","TCL3","TC","#f0c040",3.0,"truss"],["BCL2","BCL3","BC","#48d1aa",3.0,"truss"],["TCL3","TCL4","TC","#f0c040",3.0,"truss"],["BCL3","BCL4","BC","#48d1aa",3.0,"truss"],["TCL4","TCL5","TC","#f0c040",3.0,"truss"],["BCL4","BCL5","BC","#48d1aa",3.0,"truss"],["TCL5","TCL6","TC","#f0c040",3.0,"truss"],["BCL5","BCL6","BC","#48d1aa",3.0,"truss"],["TCL6","TCL7","TC","#f0c040",3.0,"truss"],["BCL6","BCL7","BC","#48d1aa",3.0,"truss"],["TCL7","TCL8","TC","#f0c040",3.0,"truss"],["BCL7","BCL8","BC","#48d1aa",3.0,"truss"],["TCL8","TCL9","TC","#f0c040",3.0,"truss"],["BCL8","BCL9","BC","#48d1aa",3.0,"truss"],["TCL9","TCL10","TC","#f0c040",3.0,"truss"],["BCL9","BCL10","BC","#48d1aa",3.0,"truss"],["TCL10","TCL11","TC","#f0c040",3.0,"truss"],["BCL10","BCL11","BC","#48d1aa",3.0,"truss"],["TCL11","TCL12","TC","#f0c040",3.0,"truss"],["BCL11","BCL12","BC","#48d1aa",3.0,"truss"],["TCL12","TCL13","TC","#f0c040",3.0,"truss"],["BCL12","BCL13","BC","#48d1aa",3.0,"truss"],["TCL13","TCL14","TC","#f0c040",3.0,"truss"],["BCL13","BCL14","BC","#48d1aa",3.0,"truss"],["TCL14","TCL15","TC","#f0c040",3.0,"truss"],["BCL14","BCL15","BC","#48d1aa",3.0,"truss"],["TCL15","TCL16","TC","#f0c040",3.0,"truss"],["BCL15","BCL16","BC","#48d1aa",3.0,"truss"],["TCL16","TCL17","TC","#f0c040",3.0,"truss"],["BCL16","BCL17","BC","#48d1aa",3.0,"truss"],["TCL17","TCL18","TC","#f0c040",3.0,"truss"],["BCL17","BCL18","BC","#48d1aa",3.0,"truss"],["TCL18","TCL19","TC","#f0c040",3.0,"truss"],["BCL18","BCL19","BC","#48d1aa",3.0,"truss"],["TCL19","TCL20","TC","#f0c040",3.0,"truss"],["BCL19","BCL20","BC","#48d1aa",3.0,"truss"],["TCL20","TCL21","TC","#f0c040",3.0,"truss"],["BCL20","BCL21","BC","#48d1aa",3.0,"truss"],["TCL21","TCL22","TC","#f0c040",3.0,"truss"],["BCL21","BCL22","BC","#48d1aa",3.0,"truss"],["TCL22","TCL23","TC","#f0c040",3.0,"truss"],["BCL22","BCL23","BC","#48d1aa",3.0,"truss"],["TCL23","TCL24","TC","#f0c040",3.0,"truss"],["BCL23","BCL24","BC","#48d1aa",3.0,"truss"],["TCL24","TCL25","TC","#f0c040",3.0,"truss"],["BCL24","BCL25","BC","#48d1aa",3.0,"truss"],["TCL25","TCL26","TC","#f0c040",3.0,"truss"],["BCL25","BCL26","BC","#48d1aa",3.0,"truss"],["TCL26","TCL27","TC","#f0c040",3.0,"truss"],["BCL26","BCL27","BC","#48d1aa",3.0,"truss"],["TCR0","TCR1","TC","#f0c040",3.0,"truss"],["BCR0","BCR1","BC","#48d1aa",3.0,"truss"],["TCR1","TCR2","TC","#f0c040",3.0,"truss"],["BCR1","BCR2","BC","#48d1aa",3.0,"truss"],["TCR2","TCR3","TC","#f0c040",3.0,"truss"],["BCR2","BCR3","BC","#48d1aa",3.0,"truss"],["TCR3","TCR4","TC","#f0c040",3.0,"truss"],["BCR3","BCR4","BC","#48d1aa",3.0,"truss"],["TCR4","TCR5","TC","#f0c040",3.0,"truss"],["BCR4","BCR5","BC","#48d1aa",3.0,"truss"],["TCR5","TCR6","TC","#f0c040",3.0,"truss"],["BCR5","BCR6","BC","#48d1aa",3.0,"truss"],["TCR6","TCR7","TC","#f0c040",3.0,"truss"],["BCR6","BCR7","BC","#48d1aa",3.0,"truss"],["TCR7","TCR8","TC","#f0c040",3.0,"truss"],["BCR7","BCR8","BC","#48d1aa",3.0,"truss"],["TCR8","TCR9","TC","#f0c040",3.0,"truss"],["BCR8","BCR9","BC","#48d1aa",3.0,"truss"],["TCR9","TCR10","TC","#f0c040",3.0,"truss"],["BCR9","BCR10","BC","#48d1aa",3.0,"truss"],["TCR10","TCR11","TC","#f0c040",3.0,"truss"],["BCR10","BCR11","BC","#48d1aa",3.0,"truss"],["TCR11","TCR12","TC","#f0c040",3.0,"truss"],["BCR11","BCR12","BC","#48d1aa",3.0,"truss"],["TCR12","TCR13","TC","#f0c040",3.0,"truss"],["BCR12","BCR13","BC","#48d1aa",3.0,"truss"],["TCR13","TCR14","TC","#f0c040",3.0,"truss"],["BCR13","BCR14","BC","#48d1aa",3.0,"truss"],["TCR14","TCR15","TC","#f0c040",3.0,"truss"],["BCR14","BCR15","BC","#48d1aa",3.0,"truss"],["TCR15","TCR16","TC","#f0c040",3.0,"truss"],["BCR15","BCR16","BC","#48d1aa",3.0,"truss"],["TCR16","TCR17","TC","#f0c040",3.0,"truss"],["BCR16","BCR17","BC","#48d1aa",3.0,"truss"],["TCR17","TCR18","TC","#f0c040",3.0,"truss"],["BCR17","BCR18","BC","#48d1aa",3.0,"truss"],["TCR18","TCR19","TC","#f0c040",3.0,"truss"],["BCR18","BCR19","BC","#48d1aa",3.0,"truss"],["TCR19","TCR20","TC","#f0c040",3.0,"truss"],["BCR19","BCR20","BC","#48d1aa",3.0,"truss"],["TCR20","TCR21","TC","#f0c040",3.0,"truss"],["BCR20","BCR21","BC","#48d1aa",3.0,"truss"],["TCR21","TCR22","TC","#f0c040",3.0,"truss"],["BCR21","BCR22","BC","#48d1aa",3.0,"truss"],["TCR22","TCR23","TC","#f0c040",3.0,"truss"],["BCR22","BCR23","BC","#48d1aa",3.0,"truss"],["TCR23","TCR24","TC","#f0c040",3.0,"truss"],["BCR23","BCR24","BC","#48d1aa",3.0,"truss"],["TCR24","TCR25","TC","#f0c040",3.0,"truss"],["BCR24","BCR25","BC","#48d1aa",3.0,"truss"],["TCR25","TCR26","TC","#f0c040",3.0,"truss"],["BCR25","BCR26","BC","#48d1aa",3.0,"truss"],["TCR26","TCR27","TC","#f0c040",3.0,"truss"],["BCR26","BCR27","BC","#48d1aa",3.0,"truss"],["TCL0","BCL0","V","#f87171",2.0,"truss"],["TCL0","BCL1","D","#c084fc",1.8,"truss"],["BCL0","TCL1","D","#c084fc",1.8,"truss"],["TCR0","BCR0","V","#f87171",2.0,"truss"],["TCR0","BCR1","D","#c084fc",1.8,"truss"],["BCR0","TCR1","D","#c084fc",1.8,"truss"],["TCL1","BCL1","V","#f87171",2.0,"truss"],["TCL1","BCL2","D","#c084fc",1.8,"truss"],["BCL1","TCL2","D","#c084fc",1.8,"truss"],["TCR1","BCR1","V","#f87171",2.0,"truss"],["TCR1","BCR2","D","#c084fc",1.8,"truss"],["BCR1","TCR2","D","#c084fc",1.8,"truss"],["TCL2","BCL2","V","#f87171",2.0,"truss"],["TCL2","BCL3","D","#c084fc",1.8,"truss"],["BCL2","TCL3","D","#c084fc",1.8,"truss"],["TCR2","BCR2","V","#f87171",2.0,"truss"],["TCR2","BCR3","D","#c084fc",1.8,"truss"],["BCR2","TCR3","D","#c084fc",1.8,"truss"],["TCL3","BCL3","V","#f87171",2.0,"truss"],["TCL3","BCL4","D","#c084fc",1.8,"truss"],["BCL3","TCL4","D","#c084fc",1.8,"truss"],["TCR3","BCR3","V","#f87171",2.0,"truss"],["TCR3","BCR4","D","#c084fc",1.8,"truss"],["BCR3","TCR4","D","#c084fc",1.8,"truss"],["TCL4","BCL4","V","#f87171",2.0,"truss"],["TCL4","BCL5","D","#c084fc",1.8,"truss"],["BCL4","TCL5","D","#c084fc",1.8,"truss"],["TCR4","BCR4","V","#f87171",2.0,"truss"],["TCR4","BCR5","D","#c084fc",1.8,"truss"],["BCR4","TCR5","D","#c084fc",1.8,"truss"],["TCL5","BCL5","V","#f87171",2.0,"truss"],["TCL5","BCL6","D","#c084fc",1.8,"truss"],["BCL5","TCL6","D","#c084fc",1.8,"truss"],["TCR5","BCR5","V","#f87171",2.0,"truss"],["TCR5","BCR6","D","#c084fc",1.8,"truss"],["BCR5","TCR6","D","#c084fc",1.8,"truss"],["TCL6","BCL6","V","#f87171",2.0,"truss"],["TCL6","BCL7","D","#c084fc",1.8,"truss"],["BCL6","TCL7","D","#c084fc",1.8,"truss"],["TCR6","BCR6","V","#f87171",2.0,"truss"],["TCR6","BCR7","D","#c084fc",1.8,"truss"],["BCR6","TCR7","D","#c084fc",1.8,"truss"],["TCL7","BCL7","V","#f87171",2.0,"truss"],["TCL7","BCL8","D","#c084fc",1.8,"truss"],["BCL7","TCL8","D","#c084fc",1.8,"truss"],["TCR7","BCR7","V","#f87171",2.0,"truss"],["TCR7","BCR8","D","#c084fc",1.8,"truss"],["BCR7","TCR8","D","#c084fc",1.8,"truss"],["TCL8","BCL8","V","#f87171",2.0,"truss"],["TCR8","BCR8","V","#f87171",2.0,"truss"],["TCL8","BCL8","V","#f87171",2.0,"truss"],["TCL8","BCL9","D","#c084fc",1.8,"truss"],["BCL8","TCL9","D","#c084fc",1.8,"truss"],["TCR8","BCR8","V","#f87171",2.0,"truss"],["TCR8","BCR9","D","#c084fc",1.8,"truss"],["BCR8","TCR9","D","#c084fc",1.8,"truss"],["TCL9","BCL9","V","#f87171",2.0,"truss"],["TCL9","BCL10","D","#c084fc",1.8,"truss"],["BCL9","TCL10","D","#c084fc",1.8,"truss"],["TCR9","BCR9","V","#f87171",2.0,"truss"],["TCR9","BCR10","D","#c084fc",1.8,"truss"],["BCR9","TCR10","D","#c084fc",1.8,"truss"],["TCL10","BCL10","V","#f87171",2.0,"truss"],["TCL10","BCL11","D","#c084fc",1.8,"truss"],["BCL10","TCL11","D","#c084fc",1.8,"truss"],["TCR10","BCR10","V","#f87171",2.0,"truss"],["TCR10","BCR11","D","#c084fc",1.8,"truss"],["BCR10","TCR11","D","#c084fc",1.8,"truss"],["TCL11","BCL11","V","#f87171",2.0,"truss"],["TCL11","BCL12","D","#c084fc",1.8,"truss"],["BCL11","TCL12","D","#c084fc",1.8,"truss"],["TCR11","BCR11","V","#f87171",2.0,"truss"],["TCR11","BCR12","D","#c084fc",1.8,"truss"],["BCR11","TCR12","D","#c084fc",1.8,"truss"],["TCL12","BCL12","V","#f87171",2.0,"truss"],["TCL12","BCL13","D","#c084fc",1.8,"truss"],["BCL12","TCL13","D","#c084fc",1.8,"truss"],["TCR12","BCR12","V","#f87171",2.0,"truss"],["TCR12","BCR13","D","#c084fc",1.8,"truss"],["BCR12","TCR13","D","#c084fc",1.8,"truss"],["TCL13","BCL13","V","#f87171",2.0,"truss"],["TCL13","BCL14","D","#c084fc",1.8,"truss"],["BCL13","TCL14","D","#c084fc",1.8,"truss"],["TCR13","BCR13","V","#f87171",2.0,"truss"],["TCR13","BCR14","D","#c084fc",1.8,"truss"],["BCR13","TCR14","D","#c084fc",1.8,"truss"],["TCL14","BCL14","V","#f87171",2.0,"truss"],["TCL14","BCL15","D","#c084fc",1.8,"truss"],["BCL14","TCL15","D","#c084fc",1.8,"truss"],["TCR14","BCR14","V","#f87171",2.0,"truss"],["TCR14","BCR15","D","#c084fc",1.8,"truss"],["BCR14","TCR15","D","#c084fc",1.8,"truss"],["TCL15","BCL15","V","#f87171",2.0,"truss"],["TCL15","BCL16","D","#c084fc",1.8,"truss"],["BCL15","TCL16","D","#c084fc",1.8,"truss"],["TCR15","BCR15","V","#f87171",2.0,"truss"],["TCR15","BCR16","D","#c084fc",1.8,"truss"],["BCR15","TCR16","D","#c084fc",1.8,"truss"],["TCL16","BCL16","V","#f87171",2.0,"truss"],["TCL16","BCL17","D","#c084fc",1.8,"truss"],["BCL16","TCL17","D","#c084fc",1.8,"truss"],["TCR16","BCR16","V","#f87171",2.0,"truss"],["TCR16","BCR17","D","#c084fc",1.8,"truss"],["BCR16","TCR17","D","#c084fc",1.8,"truss"],["TCL17","BCL17","V","#f87171",2.0,"truss"],["TCL17","BCL18","D","#c084fc",1.8,"truss"],["BCL17","TCL18","D","#c084fc",1.8,"truss"],["TCR17","BCR17","V","#f87171",2.0,"truss"],["TCR17","BCR18","D","#c084fc",1.8,"truss"],["BCR17","TCR18","D","#c084fc",1.8,"truss"],["TCL18","BCL18","V","#f87171",2.0,"truss"],["TCL18","BCL19","D","#c084fc",1.8,"truss"],["BCL18","TCL19","D","#c084fc",1.8,"truss"],["TCR18","BCR18","V","#f87171",2.0,"truss"],["TCR18","BCR19","D","#c084fc",1.8,"truss"],["BCR18","TCR19","D","#c084fc",1.8,"truss"],["TCL19","BCL19","V","#f87171",2.0,"truss"],["TCR19","BCR19","V","#f87171",2.0,"truss"],["TCL19","BCL19","V","#f87171",2.0,"truss"],["TCL19","BCL20","D","#c084fc",1.8,"truss"],["BCL19","TCL20","D","#c084fc",1.8,"truss"],["TCR19","BCR19","V","#f87171",2.0,"truss"],["TCR19","BCR20","D","#c084fc",1.8,"truss"],["BCR19","TCR20","D","#c084fc",1.8,"truss"],["TCL20","BCL20","V","#f87171",2.0,"truss"],["TCL20","BCL21","D","#c084fc",1.8,"truss"],["BCL20","TCL21","D","#c084fc",1.8,"truss"],["TCR20","BCR20","V","#f87171",2.0,"truss"],["TCR20","BCR21","D","#c084fc",1.8,"truss"],["BCR20","TCR21","D","#c084fc",1.8,"truss"],["TCL21","BCL21","V","#f87171",2.0,"truss"],["TCL21","BCL22","D","#c084fc",1.8,"truss"],["BCL21","TCL22","D","#c084fc",1.8,"truss"],["TCR21","BCR21","V","#f87171",2.0,"truss"],["TCR21","BCR22","D","#c084fc",1.8,"truss"],["BCR21","TCR22","D","#c084fc",1.8,"truss"],["TCL22","BCL22","V","#f87171",2.0,"truss"],["TCL22","BCL23","D","#c084fc",1.8,"truss"],["BCL22","TCL23","D","#c084fc",1.8,"truss"],["TCR22","BCR22","V","#f87171",2.0,"truss"],["TCR22","BCR23","D","#c084fc",1.8,"truss"],["BCR22","TCR23","D","#c084fc",1.8,"truss"],["TCL23","BCL23","V","#f87171",2.0,"truss"],["TCL23","BCL24","D","#c084fc",1.8,"truss"],["BCL23","TCL24","D","#c084fc",1.8,"truss"],["TCR23","BCR23","V","#f87171",2.0,"truss"],["TCR23","BCR24","D","#c084fc",1.8,"truss"],["BCR23","TCR24","D","#c084fc",1.8,"truss"],["TCL24","BCL24","V","#f87171",2.0,"truss"],["TCL24","BCL25","D","#c084fc",1.8,"truss"],["BCL24","TCL25","D","#c084fc",1.8,"truss"],["TCR24","BCR24","V","#f87171",2.0,"truss"],["TCR24","BCR25","D","#c084fc",1.8,"truss"],["BCR24","TCR25","D","#c084fc",1.8,"truss"],["TCL25","BCL25","V","#f87171",2.0,"truss"],["TCL25","BCL26","D","#c084fc",1.8,"truss"],["BCL25","TCL26","D","#c084fc",1.8,"truss"],["TCR25","BCR25","V","#f87171",2.0,"truss"],["TCR25","BCR26","D","#c084fc",1.8,"truss"],["BCR25","TCR26","D","#c084fc",1.8,"truss"],["TCL26","BCL26","V","#f87171",2.0,"truss"],["TCL26","BCL27","D","#c084fc",1.8,"truss"],["BCL26","TCL27","D","#c084fc",1.8,"truss"],["TCR26","BCR26","V","#f87171",2.0,"truss"],["TCR26","BCR27","D","#c084fc",1.8,"truss"],["BCR26","TCR27","D","#c084fc",1.8,"truss"],["TCL27","BCL27","V","#f87171",2.0,"truss"],["TCR27","BCR27","V","#f87171",2.0,"truss"],["TCL0","TCR0","BR","#60a5fa",2.2,"brace"],["BCL0","BCR0","FB","#34d399",2.2,"floor"],["TCL1","TCR1","BR","#60a5fa",2.2,"brace"],["BCL1","BCR1","FB","#34d399",2.2,"floor"],["TCL2","TCR2","BR","#60a5fa",2.2,"brace"],["BCL2","BCR2","FB","#34d399",2.2,"floor"],["TCL3","TCR3","BR","#60a5fa",2.2,"brace"],["BCL3","BCR3","FB","#34d399",2.2,"floor"],["TCL4","TCR4","BR","#60a5fa",2.2,"brace"],["BCL4","BCR4","FB","#34d399",2.2,"floor"],["TCL5","TCR5","BR","#60a5fa",2.2,"brace"],["BCL5","BCR5","FB","#34d399",2.2,"floor"],["TCL6","TCR6","BR","#60a5fa",2.2,"brace"],["BCL6","BCR6","FB","#34d399",2.2,"floor"],["TCL7","TCR7","BR","#60a5fa",2.2,"brace"],["BCL7","BCR7","FB","#34d399",2.2,"floor"],["TCL8","TCR8","BR","#60a5fa",2.2,"brace"],["BCL8","BCR8","FB","#34d399",2.2,"floor"],["TCL9","TCR9","BR","#60a5fa",2.2,"brace"],["BCL9","BCR9","FB","#34d399",2.2,"floor"],["TCL10","TCR10","BR","#60a5fa",2.2,"brace"],["BCL10","BCR10","FB","#34d399",2.2,"floor"],["TCL11","TCR11","BR","#60a5fa",2.2,"brace"],["BCL11","BCR11","FB","#34d399",2.2,"floor"],["TCL12","TCR12","BR","#60a5fa",2.2,"brace"],["BCL12","BCR12","FB","#34d399",2.2,"floor"],["TCL13","TCR13","BR","#60a5fa",2.2,"brace"],["BCL13","BCR13","FB","#34d399",2.2,"floor"],["TCL14","TCR14","BR","#60a5fa",2.2,"brace"],["BCL14","BCR14","FB","#34d399",2.2,"floor"],["TCL15","TCR15","BR","#60a5fa",2.2,"brace"],["BCL15","BCR15","FB","#34d399",2.2,"floor"],["TCL16","TCR16","BR","#60a5fa",2.2,"brace"],["BCL16","BCR16","FB","#34d399",2.2,"floor"],["TCL17","TCR17","BR","#60a5fa",2.2,"brace"],["BCL17","BCR17","FB","#34d399",2.2,"floor"],["TCL18","TCR18","BR","#60a5fa",2.2,"brace"],["BCL18","BCR18","FB","#34d399",2.2,"floor"],["TCL19","TCR19","BR","#60a5fa",2.2,"brace"],["BCL19","BCR19","FB","#34d399",2.2,"floor"],["TCL20","TCR20","BR","#60a5fa",2.2,"brace"],["BCL20","BCR20","FB","#34d399",2.2,"floor"],["TCL21","TCR21","BR","#60a5fa",2.2,"brace"],["BCL21","BCR21","FB","#34d399",2.2,"floor"],["TCL22","TCR22","BR","#60a5fa",2.2,"brace"],["BCL22","BCR22","FB","#34d399",2.2,"floor"],["TCL23","TCR23","BR","#60a5fa",2.2,"brace"],["BCL23","BCR23","FB","#34d399",2.2,"floor"],["TCL24","TCR24","BR","#60a5fa",2.2,"brace"],["BCL24","BCR24","FB","#34d399",2.2,"floor"],["TCL25","TCR25","BR","#60a5fa",2.2,"brace"],["BCL25","BCR25","FB","#34d399",2.2,"floor"],["TCL26","TCR26","BR","#60a5fa",2.2,"brace"],["BCL26","BCR26","FB","#34d399",2.2,"floor"],["TCL27","TCR27","BR","#60a5fa",2.2,"brace"],["BCL27","BCR27","FB","#34d399",2.2,"floor"]],"results":{"DL_ONLY":{"mm":[0.0,-1.3415,-2.7014,-3.2229,-2.8755,-1.9613,-0.9473,-0.1972,0.0,-1.9521,-4.395,-6.9,-9.0051,-10.2185,-10.2438,-9.0742,-6.9944,-4.4873,-2.0109,0.0,-0.1388,-0.8552,-1.8587,-2.7774,-3.1359,-2.6299,-1.3013,0.0],"Lmm":[0.0,-1.3352,-2.6873,-3.2051,-2.8593,-1.9505,-0.9427,-0.1965,0.0,-1.9467,-4.3805,-6.8736,-8.9679,-10.1748,-10.1999,-9.0365,-6.9673,-4.4721,-2.0051,0.0,-0.1384,-0.851,-1.8483,-2.7615,-3.1185,-2.6163,-1.2955,0.0],"Rmm":[0.0,-1.3477,-2.7155,-3.2407,-2.8918,-1.9721,-0.9519,-0.1979,0.0,-1.9575,-4.4095,-6.9263,-9.0423,-10.2622,-10.2877,-9.112,-7.0215,-4.5025,-2.0167,0.0,-0.1392,-0.8593,-1.8692,-2.7933,-3.1533,-2.6435,-1.3071,0.0],"mx":10.244,"mx_x":97.57,"rx":[{"n":"P21-L","ry":616.8},{"n":"P21-R","ry":618.0},{"n":"P22-L","ry":2398.0},{"n":"P22-R","ry":2396.3},{"n":"P23-L","ry":2381.3},{"n":"P23-R","ry":2379.5},{"n":"P24-L","ry":626.6},{"n":"P24-R","ry":628.3}]},"LL_FULL":{"mm":[0.0,-0.5779,-1.1638,-1.3884,-1.2388,-0.8449,-0.4081,-0.085,0.0,-0.841,-1.8934,-2.9725,-3.8794,-4.4021,-4.413,-3.9092,-3.0132,-1.9331,-0.8663,0.0,-0.0598,-0.3684,-0.8007,-1.1965,-1.3509,-1.133,-0.5606,0.0],"Lmm":[0.0,-0.5752,-1.1577,-1.3808,-1.2318,-0.8403,-0.4061,-0.0846,0.0,-0.8387,-1.8871,-2.9612,-3.8634,-4.3833,-4.3941,-3.8929,-3.0015,-1.9266,-0.8638,0.0,-0.0596,-0.3666,-0.7963,-1.1896,-1.3434,-1.1271,-0.5581,0.0],"Rmm":[0.0,-0.5806,-1.1698,-1.3961,-1.2458,-0.8496,-0.4101,-0.0853,0.0,-0.8433,-1.8996,-2.9839,-3.8954,-4.421,-4.432,-3.9254,-3.0248,-1.9397,-0.8688,0.0,-0.06,-0.3702,-0.8052,-1.2034,-1.3585,-1.1388,-0.5631,0.0],"mx":4.413,"mx_x":97.57,"rx":[{"n":"P21-L","ry":265.7},{"n":"P21-R","ry":266.2},{"n":"P22-L","ry":1033.0},{"n":"P22-R","ry":1032.3},{"n":"P23-L","ry":1025.9},{"n":"P23-R","ry":1025.1},{"n":"P24-L","ry":269.9},{"n":"P24-R","ry":270.7}]},"SER_I":{"mm":[0.0,-1.9194,-3.8651,-4.6114,-4.1143,-2.8062,-1.3554,-0.2821,0.0,-2.7931,-6.2883,-9.8725,-12.8845,-14.6207,-14.6569,-12.9834,-10.0075,-6.4204,-2.8772,0.0,-0.1986,-1.2236,-2.6595,-3.9739,-4.4869,-3.7629,-1.8619,0.0],"Lmm":[0.0,-1.9105,-3.8449,-4.5859,-4.0911,-2.7907,-1.3489,-0.2811,0.0,-2.7854,-6.2676,-9.8348,-12.8312,-14.5581,-14.594,-12.9295,-9.9688,-6.3987,-2.8689,0.0,-0.1981,-1.2177,-2.6446,-3.9511,-4.4619,-3.7435,-1.8537,0.0],"Rmm":[0.0,-1.9283,-3.8853,-4.6368,-4.1376,-2.8217,-1.3619,-0.2832,0.0,-2.8007,-6.3091,-9.9102,-12.9377,-14.6832,-14.7197,-13.0374,-10.0463,-6.4422,-2.8855,0.0,-0.1992,-1.2294,-2.6744,-3.9967,-4.5118,-3.7823,-1.8702,0.0],"mx":14.657,"mx_x":97.57,"rx":[{"n":"P21-L","ry":882.6},{"n":"P21-R","ry":884.2},{"n":"P22-L","ry":3431.0},{"n":"P22-R","ry":3428.7},{"n":"P23-L","ry":3407.2},{"n":"P23-R","ry":3404.6},{"n":"P24-L","ry":896.5},{"n":"P24-R","ry":899.0}]},"SER_MID":{"mm":[0.0,-1.0221,-1.8877,-1.9589,-1.341,-0.4176,0.323,0.548,0.0,-3.2246,-7.1489,-11.1384,-14.4517,-16.3636,-16.4279,-14.6277,-11.3784,-7.3838,-3.3746,0.0,0.7103,0.5945,-0.0932,-1.0085,-1.653,-1.6413,-0.8906,0.0],"Lmm":[0.0,-1.015,-1.8727,-1.941,-1.3253,-0.4077,0.3267,0.5482,0.0,-3.2174,-7.1287,-11.1011,-14.3987,-16.3009,-16.3648,-14.5734,-11.3395,-7.3619,-3.3663,0.0,0.7096,0.597,-0.0845,-0.9939,-1.6362,-1.6277,-0.8844,0.0],"Rmm":[0.0,-1.0292,-1.9027,-1.9768,-1.3567,-0.4276,0.3193,0.5478,0.0,-3.2318,-7.1691,-11.1756,-14.5048,-16.4262,-16.491,-14.6819,-11.4174,-7.4056,-3.3829,0.0,0.711,0.5921,-0.1019,-1.0231,-1.6698,-1.6549,-0.8967,0.0],"mx":16.428,"mx_x":97.57,"rx":[{"n":"P21-L","ry":520.5},{"n":"P21-R","ry":522.1},{"n":"P22-L","ry":2848.9},{"n":"P22-R","ry":2846.3},{"n":"P23-L","ry":2803.0},{"n":"P23-R","ry":2800.2},{"n":"P24-L","ry":539.1},{"n":"P24-R","ry":541.9}]}},"FD":{"TCL_0":-163.8,"BCL_0":-86.3,"TCL_1":347.1,"BCL_1":-613.8,"TCL_2":732.1,"BCL_2":-950.2,"TCL_3":619.0,"BCL_3":-857.2,"TCL_4":112.1,"BCL_4":-401.6,"TCL_5":-641.3,"BCL_5":279.9,"TCL_6":-1532.9,"BCL_6":1036.0,"TCL_7":-2388.1,"BCL_7":1593.1,"TCL_8":-2238.4,"BCL_8":1863.1,"TCL_9":-1108.7,"BCL_9":1042.7,"TCL_10":-11.0,"BCL_10":74.2,"TCL_11":894.2,"BCL_11":-758.8,"TCL_12":1515.8,"BCL_12":-1325.2,"TCL_13":1743.4,"BCL_13":-1533.6,"TCL_14":1537.3,"BCL_14":-1345.3,"TCL_15":935.2,"BCL_15":-797.1,"TCL_16":46.0,"BCL_16":20.5,"TCL_17":-1039.8,"BCL_17":976.5,"TCL_18":-2157.5,"BCL_18":1782.9,"TCL_19":-2305.2,"BCL_19":1858.1,"TCL_20":-1435.4,"BCL_20":1269.5,"TCL_21":-533.2,"BCL_21":488.2,"TCL_22":228.3,"BCL_22":-213.6,"TCL_23":738.0,"BCL_23":-681.3,"TCL_24":845.6,"BCL_24":-775.0,"TCL_25":446.3,"BCL_25":-423.9,"TCL_26":-118.0,"BCL_26":153.0,"TCR_0":-169.5,"BCR_0":-88.8,"TCR_1":341.8,"BCR_1":-631.3,"TCR_2":730.8,"BCR_2":-980.8,"TCR_3":619.8,"BCR_3":-887.4,"TCR_4":113.4,"BCR_4":-418.4,"TCR_5":-640.8,"BCR_5":286.3,"TCR_6":-1533.6,"BCR_6":1070.1,"TCR_7":-2391.0,"BCR_7":1650.2,"TCR_8":-2242.8,"BCR_8":1924.6,"TCR_9":-1112.4,"BCR_9":1077.6,"TCR_10":-14.1,"BCR_10":75.7,"TCR_11":892.1,"BCR_11":-785.7,"TCR_12":1514.5,"BCR_12":-1370.7,"TCR_13":1742.5,"BCR_13":-1585.6,"TCR_14":1536.4,"BCR_14":-1390.9,"TCR_15":934.0,"BCR_15":-824.3,"TCR_16":44.2,"BCR_16":21.7,"TCR_17":-1041.8,"BCR_17":1011.4,"TCR_18":-2160.2,"BCR_18":1846.1,"TCR_19":-2306.5,"BCR_19":1918.5,"TCR_20":-1434.3,"BCR_20":1307.7,"TCR_21":-530.5,"BCR_21":498.1,"TCR_22":232.3,"BCR_22":-227.4,"TCR_23":741.8,"BCR_23":-708.6,"TCR_24":847.2,"BCR_24":-801.8,"TCR_25":443.5,"BCR_25":-436.0,"TCR_26":-122.7,"BCR_26":158.9,"D1L_0":-152.9,"D2L_0":92.8,"VL_0":2.4,"D1R_0":-151.9,"D2R_0":89.1,"VR_0":0.8,"D1L_1":-291.8,"D2L_1":224.9,"VL_1":147.8,"D1R_1":-296.3,"D2R_1":222.4,"VR_1":152.3,"D1L_2":-97.6,"D2L_2":18.0,"VL_2":-123.4,"D1R_2":-103.7,"D2R_2":14.3,"VR_2":-121.1,"D1L_3":107.4,"D2L_3":-189.7,"VL_3":-98.5,"D1R_3":101.6,"D2R_3":-192.2,"VR_3":-95.2,"D1L_4":280.3,"D2L_4":-390.8,"VL_4":-101.7,"D1R_4":276.7,"D2R_4":-391.1,"VR_4":-99.3,"D1L_5":388.7,"D2L_5":-550.4,"VL_5":-99.9,"D1R_5":388.0,"D2R_5":-548.5,"VR_5":-99.4,"D1L_6":462.1,"D2L_6":-640.6,"VL_6":-145.2,"D1R_6":463.5,"D2R_6":-637.6,"VR_6":-146.8,"D1L_7":531.7,"D2L_7":-293.6,"VL_7":-39.8,"D1R_7":536.0,"D2R_7":-291.3,"VR_7":-44.0,"VL_8":703.8,"VR_8":702.2,"D1L_8":-457.4,"D2L_8":762.9,"D1R_8":-454.2,"D2R_8":767.1,"D1L_9":-778.7,"D2L_9":671.4,"VL_9":-87.1,"D1R_9":-775.6,"D2R_9":672.2,"VR_9":-91.3,"D1L_10":-647.3,"D2L_10":576.3,"VL_10":-181.7,"D1R_10":-646.3,"D2R_10":574.9,"VR_10":-182.8,"D1L_11":-454.9,"D2L_11":449.0,"VL_11":-138.1,"D1R_11":-456.6,"D2R_11":445.0,"VR_11":-136.5,"D1L_12":-228.0,"D2L_12":256.9,"VL_12":-143.0,"D1R_12":-232.1,"D2R_12":251.2,"VR_12":-139.2,"D1L_13":15.2,"D2L_13":27.4,"VL_13":-143.4,"D1R_13":9.6,"D2R_13":21.6,"VR_13":-138.2,"D1L_14":245.6,"D2L_14":-215.6,"VL_14":-143.4,"D1R_14":240.2,"D2R_14":-220.0,"VR_14":-138.3,"D1L_15":439.5,"D2L_15":-443.4,"VL_15":-143.1,"D1R_15":435.7,"D2R_15":-445.3,"VR_15":-139.3,"D1L_16":569.0,"D2L_16":-637.3,"VL_16":-138.4,"D1R_16":567.9,"D2R_16":-636.4,"VR_16":-136.9,"D1L_17":666.8,"D2L_17":-771.0,"VL_17":-181.1,"D1R_17":668.0,"D2R_17":-768.1,"VR_17":-182.4,"D1L_18":751.9,"D2L_18":-454.4,"VL_18":-87.1,"D1R_18":756.5,"D2R_18":-451.3,"VR_18":-91.6,"VL_19":686.7,"VR_19":684.8,"D1L_19":-286.2,"D2L_19":565.1,"D1R_19":-283.4,"D2R_19":569.5,"D1L_20":-625.4,"D2L_20":497.8,"VL_20":-69.7,"D1R_20":-621.8,"D2R_20":499.6,"VR_20":-74.3,"D1L_21":-526.4,"D2L_21":430.3,"VL_21":-177.0,"D1R_21":-523.8,"D2R_21":430.1,"VR_21":-179.2,"D1L_22":-357.7,"D2L_22":324.9,"VL_22":-134.2,"D1R_22":-357.1,"D2R_22":321.9,"VR_22":-134.2,"D1L_23":-147.7,"D2L_23":152.2,"VL_23":-136.7,"D1R_23":-149.0,"D2R_23":147.1,"VR_23":-134.9,"D1L_24":67.4,"D2L_24":-55.1,"VL_24":-132.8,"D1R_24":65.1,"D2R_24":-60.5,"VR_24":-130.1,"D1L_25":278.4,"D2L_25":-255.0,"VL_25":-156.3,"D1R_25":277.6,"D2R_25":-258.6,"VR_25":-154.8,"D1L_26":178.3,"D2L_26":-145.5,"VL_26":99.2,"D1R_26":177.5,"D2R_26":-144.2,"VR_26":102.3,"VL_27":11.1,"VR_27":9.9},"MAF":2391.0,"MC":-2391.0,"MT":1924.6,"HV":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,-6.9e-07,-1.02e-06,-1.03e-06,-8.8e-07,-6.4e-07,-4e-07,-1.8e-07,0.0,1.2e-07,2.1e-07,2.7e-07,3e-07,2.9e-07,2.6e-07,2e-07,1.5e-07,9e-08,4e-08,0.0,-2e-08,-4e-08,-5e-08,-5e-08,-4e-08,-3e-08,-1e-08,0.0],[0.0,-1.02e-06,-2.16e-06,-2.39e-06,-2.11e-06,-1.58e-06,-9.9e-07,-4.5e-07,0.0,3.1e-07,5.4e-07,6.9e-07,7.6e-07,7.4e-07,6.5e-07,5.2e-07,3.7e-07,2.2e-07,1e-07,0.0,-6e-08,-1e-07,-1.2e-07,-1.2e-07,-1e-07,-6e-08,-3e-08,0.0],[0.0,-1.03e-06,-2.39e-06,-3.27e-06,-3.08e-06,-2.39e-06,-1.53e-06,-7.1e-07,0.0,4.8e-07,8.4e-07,1.07e-06,1.17e-06,1.14e-06,1.01e-06,8.1e-07,5.8e-07,3.5e-07,1.5e-07,0.0,-9e-08,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-1e-07,-4e-08,0.0],[0.0,-8.8e-07,-2.11e-06,-3.08e-06,-3.46e-06,-2.84e-06,-1.87e-06,-8.8e-07,0.0,5.8e-07,1.02e-06,1.3e-06,1.42e-06,1.39e-06,1.23e-06,9.8e-07,7e-07,4.2e-07,1.9e-07,0.0,-1.1e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.2e-07,-5e-08,0.0],[0.0,-6.4e-07,-1.58e-06,-2.39e-06,-2.84e-06,-2.78e-06,-1.93e-06,-9.2e-07,0.0,5.9e-07,1.03e-06,1.31e-06,1.43e-06,1.4e-06,1.23e-06,9.9e-07,7e-07,4.3e-07,1.9e-07,0.0,-1.1e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.2e-07,-5e-08,0.0],[0.0,-4e-07,-9.9e-07,-1.53e-06,-1.87e-06,-1.93e-06,-1.68e-06,-8.5e-07,0.0,4.8e-07,8.4e-07,1.08e-06,1.18e-06,1.15e-06,1.02e-06,8.1e-07,5.8e-07,3.5e-07,1.5e-07,0.0,-9e-08,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-1e-07,-4e-08,0.0],[0.0,-1.8e-07,-4.5e-07,-7.1e-07,-8.8e-07,-9.2e-07,-8.5e-07,-6.3e-07,0.0,2.9e-07,5e-07,6.4e-07,6.9e-07,6.7e-07,6e-07,4.8e-07,3.4e-07,2.1e-07,9e-08,0.0,-5e-08,-9e-08,-1.1e-07,-1.1e-07,-9e-08,-6e-08,-2e-08,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,1.2e-07,3.1e-07,4.8e-07,5.8e-07,5.9e-07,4.8e-07,2.9e-07,0.0,-7.1e-07,-9.8e-07,-1.13e-06,-1.18e-06,-1.13e-06,-9.8e-07,-7.8e-07,-5.6e-07,-3.5e-07,-1.6e-07,0.0,1e-07,1.7e-07,2e-07,2e-07,1.7e-07,1.1e-07,5e-08,0.0],[0.0,2.1e-07,5.4e-07,8.4e-07,1.02e-06,1.03e-06,8.4e-07,5e-07,0.0,-9.8e-07,-1.97e-06,-2.39e-06,-2.54e-06,-2.45e-06,-2.16e-06,-1.74e-06,-1.26e-06,-7.8e-07,-3.5e-07,0.0,2.2e-07,3.8e-07,4.7e-07,4.7e-07,3.9e-07,2.6e-07,1.1e-07,0.0],[0.0,2.7e-07,6.9e-07,1.07e-06,1.3e-06,1.31e-06,1.08e-06,6.4e-07,0.0,-1.13e-06,-2.39e-06,-3.52e-06,-3.9e-06,-3.84e-06,-3.44e-06,-2.8e-06,-2.05e-06,-1.28e-06,-5.9e-07,0.0,3.8e-07,6.4e-07,7.8e-07,7.9e-07,6.6e-07,4.4e-07,1.8e-07,0.0],[0.0,3e-07,7.6e-07,1.17e-06,1.42e-06,1.43e-06,1.18e-06,6.9e-07,0.0,-1.18e-06,-2.54e-06,-3.9e-06,-4.96e-06,-5.09e-06,-4.66e-06,-3.86e-06,-2.85e-06,-1.8e-06,-8.3e-07,0.0,5.4e-07,9.1e-07,1.11e-06,1.12e-06,9.4e-07,6.2e-07,2.6e-07,0.0],[0.0,2.9e-07,7.4e-07,1.14e-06,1.39e-06,1.4e-06,1.15e-06,6.7e-07,0.0,-1.13e-06,-2.45e-06,-3.84e-06,-5.09e-06,-5.87e-06,-5.59e-06,-4.72e-06,-3.54e-06,-2.26e-06,-1.05e-06,0.0,6.8e-07,1.16e-06,1.41e-06,1.41e-06,1.18e-06,7.9e-07,3.3e-07,0.0],[0.0,2.6e-07,6.5e-07,1.01e-06,1.23e-06,1.23e-06,1.02e-06,6e-07,0.0,-9.8e-07,-2.16e-06,-3.44e-06,-4.66e-06,-5.59e-06,-5.94e-06,-5.21e-06,-3.99e-06,-2.59e-06,-1.21e-06,0.0,7.7e-07,1.32e-06,1.6e-06,1.61e-06,1.35e-06,9e-07,3.7e-07,0.0],[0.0,2e-07,5.2e-07,8.1e-07,9.8e-07,9.9e-07,8.1e-07,4.8e-07,0.0,-7.8e-07,-1.74e-06,-2.8e-06,-3.86e-06,-4.72e-06,-5.21e-06,-5.13e-06,-4.08e-06,-2.7e-06,-1.28e-06,0.0,8e-07,1.36e-06,1.65e-06,1.66e-06,1.39e-06,9.3e-07,3.8e-07,0.0],[0.0,1.5e-07,3.7e-07,5.8e-07,7e-07,7e-07,5.8e-07,3.4e-07,0.0,-5.6e-07,-1.26e-06,-2.05e-06,-2.85e-06,-3.54e-06,-3.99e-06,-4.08e-06,-3.71e-06,-2.55e-06,-1.23e-06,0.0,7.3e-07,1.25e-06,1.52e-06,1.52e-06,1.28e-06,8.5e-07,3.5e-07,0.0],[0.0,9e-08,2.2e-07,3.5e-07,4.2e-07,4.3e-07,3.5e-07,2.1e-07,0.0,-3.5e-07,-7.8e-07,-1.28e-06,-1.8e-06,-2.26e-06,-2.59e-06,-2.7e-06,-2.55e-06,-2.11e-06,-1.06e-06,0.0,5.8e-07,9.8e-07,1.19e-06,1.19e-06,1e-06,6.7e-07,2.8e-07,0.0],[0.0,4e-08,1e-07,1.5e-07,1.9e-07,1.9e-07,1.5e-07,9e-08,0.0,-1.6e-07,-3.5e-07,-5.9e-07,-8.3e-07,-1.05e-06,-1.21e-06,-1.28e-06,-1.23e-06,-1.06e-06,-7.5e-07,0.0,3.4e-07,5.6e-07,6.8e-07,6.8e-07,5.7e-07,3.8e-07,1.6e-07,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,-2e-08,-6e-08,-9e-08,-1.1e-07,-1.1e-07,-9e-08,-5e-08,0.0,1e-07,2.2e-07,3.8e-07,5.4e-07,6.8e-07,7.7e-07,8e-07,7.3e-07,5.8e-07,3.4e-07,0.0,-6.8e-07,-9.2e-07,-1.02e-06,-9.8e-07,-8e-07,-5.2e-07,-2.1e-07,0.0],[0.0,-4e-08,-1e-07,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-9e-08,0.0,1.7e-07,3.8e-07,6.4e-07,9.1e-07,1.16e-06,1.32e-06,1.36e-06,1.25e-06,9.8e-07,5.6e-07,0.0,-9.2e-07,-1.81e-06,-2.1e-06,-2.04e-06,-1.69e-06,-1.12e-06,-4.6e-07,0.0],[0.0,-5e-08,-1.2e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.1e-07,0.0,2e-07,4.7e-07,7.8e-07,1.11e-06,1.41e-06,1.6e-06,1.65e-06,1.52e-06,1.19e-06,6.8e-07,0.0,-1.02e-06,-2.1e-06,-2.99e-06,-3.06e-06,-2.59e-06,-1.73e-06,-7.2e-07,0.0],[0.0,-5e-08,-1.2e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.1e-07,0.0,2e-07,4.7e-07,7.9e-07,1.12e-06,1.41e-06,1.61e-06,1.66e-06,1.52e-06,1.19e-06,6.8e-07,0.0,-9.8e-07,-2.04e-06,-3.06e-06,-3.7e-06,-3.3e-06,-2.27e-06,-9.6e-07,0.0],[0.0,-4e-08,-1e-07,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-9e-08,0.0,1.7e-07,3.9e-07,6.6e-07,9.4e-07,1.18e-06,1.35e-06,1.39e-06,1.28e-06,1e-06,5.7e-07,0.0,-8e-07,-1.69e-06,-2.59e-06,-3.3e-06,-3.48e-06,-2.55e-06,-1.11e-06,0.0],[0.0,-3e-08,-6e-08,-1e-07,-1.2e-07,-1.2e-07,-1e-07,-6e-08,0.0,1.1e-07,2.6e-07,4.4e-07,6.2e-07,7.9e-07,9e-07,9.3e-07,8.5e-07,6.7e-07,3.8e-07,0.0,-5.2e-07,-1.12e-06,-1.73e-06,-2.27e-06,-2.55e-06,-2.29e-06,-1.08e-06,0.0],[0.0,-1e-08,-3e-08,-4e-08,-5e-08,-5e-08,-4e-08,-2e-08,0.0,5e-08,1.1e-07,1.8e-07,2.6e-07,3.3e-07,3.7e-07,3.8e-07,3.5e-07,2.8e-07,1.6e-07,0.0,-2.1e-07,-4.6e-07,-7.2e-07,-9.6e-07,-1.11e-06,-1.08e-06,-7.3e-07,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]],"HVsup":[[-1.0,-0.915071,-0.777327,-0.62281,-0.466853,-0.322335,-0.196078,-0.089535,-0.0,0.071891,0.127388,0.163266,0.178388,0.174063,0.153807,0.122954,0.087521,0.052988,0.023224,-0.0,-0.013196,-0.022345,-0.027172,-0.027211,-0.022808,-0.015204,-0.006317,-0.0],[-0.0,-0.100761,-0.262956,-0.439348,-0.607547,-0.750489,-0.860355,-0.937104,-0.98609,-1.0,-0.984316,-0.93449,-0.850759,-0.738087,-0.605266,-0.463675,-0.324833,-0.198246,-0.089564,-0.0,0.060594,0.103851,0.126517,0.1268,0.106326,0.070892,0.029457,-0.0],[-0.0,0.021745,0.055414,0.08608,0.104481,0.105053,0.08641,0.050419,-0.0,-0.077591,-0.175243,-0.292856,-0.425475,-0.564238,-0.698058,-0.815624,-0.907844,-0.969201,-0.998819,-1.0,-0.963365,-0.894867,-0.78861,-0.644752,-0.47153,-0.286548,-0.112118,-0.0],[-0.0,-0.004492,-0.011422,-0.017725,-0.021511,-0.021643,-0.01784,-0.010562,-0.0,0.019806,0.046055,0.077263,0.109847,0.138674,0.158055,0.162885,0.149737,0.117255,0.066422,-0.0,-0.084889,-0.188104,-0.31252,-0.456625,-0.613487,-0.77014,-0.911438,-1.0]],"HVR_RAW":[[-0.5,-0.0,-0.0,-0.0],[-0.4575357,-0.05109102,0.01087247,-0.00224575],[-0.38866353,-0.13333241,0.02770715,-0.00571122],[-0.31140489,-0.22277263,0.04304007,-0.00886255],[-0.23342656,-0.30805839,0.05224026,-0.01075531],[-0.16116745,-0.38053773,0.05252661,-0.01082143],[-0.09803916,-0.43624556,0.04320482,-0.0089201],[-0.04476732,-0.47516125,0.02520955,-0.00528098],[-0.0,-0.5,-0.0,-0.0],[0.03594575,-0.50705295,-0.0387956,0.0099028],[0.06369399,-0.49910009,-0.08762145,0.02302756],[0.08163295,-0.47383611,-0.14642815,0.03863131],[0.08919402,-0.4313801,-0.21273745,0.05492352],[0.08703173,-0.37424943,-0.28211919,0.06933688],[0.07690334,-0.30690189,-0.34902885,0.07902739],[0.06147718,-0.23510762,-0.40781212,0.08144255],[0.04376072,-0.16470736,-0.45392191,0.07486855],[0.02649407,-0.10052112,-0.48460031,0.05862736],[0.01161198,-0.04541372,-0.4994095,0.03321124],[-0.0,-0.0,-0.5,-0.0],[-0.00659788,0.03072451,-0.48168229,-0.04244433],[-0.01117232,0.05265798,-0.4474335,-0.09405216],[-0.01358578,0.06415086,-0.39430513,-0.15625995],[-0.01360554,0.06429434,-0.32237614,-0.22831266],[-0.01140406,0.0539127,-0.23576496,-0.30674369],[-0.00760183,0.03594575,-0.14327401,-0.38506991],[-0.0031583,0.01493614,-0.05605882,-0.45571902],[-0.0,-0.0,-0.0,-0.5]],"eig":{"V":[{"f":4.1027,"T":0.2437,"d":[0.0,-0.083671,-0.204358,-0.303547,-0.35143,-0.336304,-0.263337,-0.147065,0.0,0.213112,0.449167,0.68235,0.875503,0.989913,1.0,0.902932,0.719382,0.484913,0.235759,0.0,-0.174665,-0.313761,-0.402182,-0.423627,-0.371355,-0.256631,-0.109324,0.0]},{"f":6.8229,"T":0.1466,"d":[0.0,-0.283108,-0.648228,-0.891249,-0.941549,-0.809024,-0.560989,-0.27266,0.0,0.188885,0.312052,0.350946,0.296793,0.1651,-0.004963,-0.160894,-0.255151,-0.25917,-0.170022,0.0,0.283092,0.587005,0.852433,1.0,0.95587,0.704459,0.312999,0.0]},{"f":7.952,"T":0.1258,"d":[0.0,0.342376,0.759197,1.0,0.998087,0.794845,0.498434,0.210812,0.0,0.020092,0.128732,0.29018,0.454994,0.562048,0.570048,0.476405,0.318236,0.154831,0.036502,0.0,0.181136,0.434163,0.698724,0.883878,0.891436,0.681447,0.309685,0.0]},{"f":12.587,"T":0.0794,"d":[0.0,-0.187649,-0.36166,-0.375485,-0.241495,-0.053411,0.081036,0.105382,0.0,-0.433161,-0.828744,-1.0,-0.826958,-0.326842,0.310136,0.815605,0.996411,0.831184,0.436749,0.0,-0.10931,-0.082785,0.058681,0.253867,0.38958,0.370259,0.189181,0.0]},{"f":18.6489,"T":0.0536,"d":[0.0,-0.484465,-0.783155,-0.499327,0.127009,0.630768,0.727656,0.444953,0.0,-0.252113,-0.326396,-0.18311,0.105593,0.351539,0.381935,0.177994,-0.109836,-0.283806,-0.245129,0.0,0.564718,0.934402,0.818704,0.176325,-0.630468,-1.0,-0.620006,0.0]},{"f":19.1503,"T":0.0522,"d":[0.0,0.627706,1.0,0.603696,-0.223798,-0.859349,-0.947661,-0.551772,0.0,0.021149,-0.099784,-0.238197,-0.280951,-0.16131,0.061318,0.245248,0.283804,0.188372,0.048854,0.0,0.42945,0.748998,0.688669,0.190937,-0.467165,-0.787889,-0.497158,0.0]}],"L":[{"f":0.29,"T":3.4486,"d":[0.0,0.114187,0.226883,0.336621,0.441972,0.541561,0.634088,0.718348,0.793243,0.860313,0.915188,0.957092,0.985431,0.999801,1.0,0.986025,0.958074,0.916543,0.862021,0.795281,0.720384,0.636028,0.543318,0.443472,0.337802,0.227697,0.1146,0.0]},{"f":1.1598,"T":0.8623,"d":[0.0,-0.2266,-0.441418,-0.633292,-0.79225,-0.910027,-0.980497,-1.0,-0.967518,-0.880143,-0.743053,-0.563988,-0.353065,-0.1222,0.11557,0.346809,0.55846,0.738563,0.876945,0.965793,0.999808,0.981471,0.911744,0.794277,0.635222,0.442911,0.227407,0.0]},{"f":2.6092,"T":0.3833,"d":[0.0,0.339509,0.639526,0.86516,0.990167,1.0,0.89351,0.683073,0.393143,0.042656,-0.313237,-0.629572,-0.866371,-0.99371,-0.995503,-0.871523,-0.637433,-0.322812,0.032577,0.383835,0.676555,0.889974,0.999109,0.991185,0.867134,0.641497,0.340703,0.0]},{"f":4.6401,"T":0.2155,"d":[0.0,-0.442681,-0.794506,-0.983276,-0.970244,-0.758073,-0.390303,0.057604,0.493744,0.839605,0.99853,0.935045,0.663243,0.243664,-0.230231,-0.652844,-0.930021,-1.0,-0.847211,-0.50574,-0.06958,0.380944,0.752705,0.968848,0.984678,0.796925,0.444401,0.0]},{"f":7.2489,"T":0.138,"d":[0.0,0.545431,0.917681,0.998575,0.762434,0.284253,-0.284103,-0.762132,-0.997978,-0.906497,-0.503077,0.073455,0.62458,0.960503,0.965551,0.637996,0.09065,-0.487978,-0.898637,-1.0,-0.771636,-0.296334,0.273826,0.756469,0.997212,0.919056,0.546987,0.0]},{"f":10.4326,"T":0.0959,"d":[-0.0,0.63573,0.984343,0.888425,0.391318,-0.28242,-0.828427,-1.0,-0.719396,-0.084131,0.592206,0.978684,0.886218,0.36012,-0.342142,-0.876915,-0.982568,-0.607444,0.064857,0.705394,0.997836,0.836032,0.293852,-0.382047,-0.884274,-0.984458,-0.637045,-0.0]}],"T":[{"f":0.1933,"T":5.1729,"d":[0.0,0.114187,0.226883,0.336621,0.441972,0.541561,0.634088,0.718348,0.793243,0.860313,0.915188,0.957092,0.985431,0.999801,1.0,0.986025,0.958074,0.916543,0.862021,0.795281,0.720384,0.636028,0.543318,0.443472,0.337802,0.227697,0.1146,0.0]},{"f":0.7732,"T":1.2934,"d":[0.0,-0.2266,-0.441418,-0.633292,-0.79225,-0.910027,-0.980497,-1.0,-0.967518,-0.880143,-0.743053,-0.563988,-0.353065,-0.1222,0.11557,0.346809,0.55846,0.738563,0.876945,0.965793,0.999808,0.981471,0.911744,0.794277,0.635222,0.442911,0.227407,0.0]},{"f":1.7395,"T":0.5749,"d":[0.0,0.339509,0.639526,0.86516,0.990167,1.0,0.89351,0.683073,0.393143,0.042656,-0.313237,-0.629572,-0.866371,-0.99371,-0.995503,-0.871523,-0.637433,-0.322812,0.032577,0.383835,0.676555,0.889974,0.999109,0.991185,0.867134,0.641497,0.340703,0.0]},{"f":3.0934,"T":0.3233,"d":[0.0,-0.442681,-0.794506,-0.983276,-0.970244,-0.758073,-0.390303,0.057604,0.493744,0.839605,0.99853,0.935045,0.663243,0.243664,-0.230231,-0.652844,-0.930021,-1.0,-0.847211,-0.50574,-0.06958,0.380944,0.752705,0.968848,0.984678,0.796925,0.444401,0.0]},{"f":4.8326,"T":0.2069,"d":[0.0,0.545431,0.917681,0.998575,0.762434,0.284253,-0.284103,-0.762132,-0.997978,-0.906497,-0.503077,0.073455,0.62458,0.960503,0.965551,0.637996,0.09065,-0.487978,-0.898637,-1.0,-0.771636,-0.296334,0.273826,0.756469,0.997212,0.919056,0.546987,0.0]},{"f":6.9551,"T":0.1438,"d":[-0.0,0.63573,0.984343,0.888425,0.391318,-0.28242,-0.828427,-1.0,-0.719396,-0.084131,0.592206,0.978684,0.886218,0.36012,-0.342142,-0.876915,-0.982568,-0.607444,0.064857,0.705394,0.997836,0.836032,0.293852,-0.382047,-0.884274,-0.984458,-0.637045,-0.0]}]},"results_ops":{"DL_ONLY":{"mm":[0.0,-1.3463,-2.7125,-3.2368,-2.8882,-1.9695,-0.9503,-0.1978,0.0,-1.9586,-4.4104,-6.9273,-9.0429,-10.2626,-10.2882,-9.1129,-7.0228,-4.5039,-2.0182,0.0,-0.1387,-0.8571,-1.866,-2.7892,-3.1491,-2.6403,-1.3056,0.0],"Lmm":[0.0,-1.3405,-2.6992,-3.2198,-2.8723,-1.9584,-0.945,-0.1964,0.0,-1.9544,-4.3989,-6.9061,-9.0127,-10.2271,-10.2525,-9.0823,-7.0011,-4.4918,-2.0137,0.0,-0.1376,-0.8521,-1.8551,-2.7735,-3.1323,-2.6275,-1.3002,0.0],"Rmm":[0.0,-1.3521,-2.7258,-3.2538,-2.9041,-1.9806,-0.9555,-0.1992,0.0,-1.9628,-4.4219,-6.9485,-9.0731,-10.2981,-10.3238,-9.1434,-7.0446,-4.5159,-2.0228,0.0,-0.1399,-0.8621,-1.8768,-2.8049,-3.1658,-2.6532,-1.3111,0.0],"mx":10.288,"mx_x":97.57,"rx":[{"n":"P21-L","ry":617.0},{"n":"P21-R","ry":618.1},{"n":"P22-L","ry":2397.8},{"n":"P22-R","ry":2396.2},{"n":"P23-L","ry":2381.1},{"n":"P23-R","ry":2379.5},{"n":"P24-L","ry":626.8},{"n":"P24-R","ry":628.3}]},"LL_FULL":{"mm":[0.0,-0.58,-1.1685,-1.3944,-1.2442,-0.8484,-0.4094,-0.0852,0.0,-0.8438,-1.9,-2.9843,-3.8957,-4.4211,-4.4321,-3.9258,-3.0254,-1.9403,-0.8695,0.0,-0.0598,-0.3692,-0.8039,-1.2016,-1.3566,-1.1375,-0.5625,0.0],"Lmm":[0.0,-0.5775,-1.1628,-1.3871,-1.2374,-0.8437,-0.4071,-0.0846,0.0,-0.842,-1.895,-2.9751,-3.8827,-4.4058,-4.4168,-3.9127,-3.0161,-1.9351,-0.8675,0.0,-0.0593,-0.3671,-0.7992,-1.1948,-1.3494,-1.1319,-0.5601,0.0],"Rmm":[0.0,-0.5825,-1.1743,-1.4017,-1.2511,-0.8532,-0.4116,-0.0858,0.0,-0.8456,-1.905,-2.9934,-3.9087,-4.4364,-4.4475,-3.939,-3.0348,-1.9455,-0.8714,0.0,-0.0603,-0.3714,-0.8085,-1.2084,-1.3638,-1.143,-0.5648,0.0],"mx":4.432,"mx_x":97.57,"rx":[{"n":"P21-L","ry":265.8},{"n":"P21-R","ry":266.3},{"n":"P22-L","ry":1033.0},{"n":"P22-R","ry":1032.3},{"n":"P23-L","ry":1025.8},{"n":"P23-R","ry":1025.1},{"n":"P24-L","ry":270.0},{"n":"P24-R","ry":270.7}]},"SER_I":{"mm":[0.0,-1.9263,-3.881,-4.6312,-4.1324,-2.8179,-1.3596,-0.283,0.0,-2.8024,-6.3104,-9.9116,-12.9386,-14.6837,-14.7203,-13.0387,-10.0482,-6.4441,-2.8877,0.0,-0.1985,-1.2263,-2.6698,-3.9908,-4.5057,-3.7778,-1.8681,0.0],"Lmm":[0.0,-1.918,-3.862,-4.6069,-4.1096,-2.8021,-1.3521,-0.2811,0.0,-2.7964,-6.2939,-9.8812,-12.8954,-14.6329,-14.6693,-12.995,-10.0171,-6.4269,-2.8812,0.0,-0.1968,-1.2192,-2.6543,-3.9684,-4.4818,-3.7594,-1.8603,0.0],"Rmm":[0.0,-1.9346,-3.9001,-4.6555,-4.1551,-2.8338,-1.3672,-0.285,0.0,-2.8084,-6.3269,-9.9419,-12.9817,-14.7346,-14.7714,-13.0824,-10.0794,-6.4614,-2.8942,0.0,-0.2001,-1.2335,-2.6853,-4.0133,-4.5296,-3.7962,-1.8759,0.0],"mx":14.72,"mx_x":97.57,"rx":[{"n":"P21-L","ry":882.8},{"n":"P21-R","ry":884.4},{"n":"P22-L","ry":3430.8},{"n":"P22-R","ry":3428.5},{"n":"P23-L","ry":3406.9},{"n":"P23-R","ry":3404.6},{"n":"P24-L","ry":896.8},{"n":"P24-R","ry":899.0}]},"SER_MID":{"mm":[0.0,-1.0273,-1.8984,-1.9712,-1.3512,-0.4233,0.3222,0.5485,0.0,-3.2339,-7.1714,-11.1783,-14.5073,-16.4286,-16.4935,-14.6849,-11.4208,-7.4087,-3.3855,0.0,0.7123,0.5958,-0.0968,-1.017,-1.6638,-1.6506,-0.8947,0.0],"Lmm":[0.0,-1.0203,-1.8834,-1.9528,-1.3345,-0.4119,0.3275,0.5498,0.0,-3.2285,-7.1558,-11.149,-14.4651,-16.3785,-16.443,-14.6417,-11.3901,-7.3919,-3.3793,0.0,0.713,0.6003,-0.0862,-1.0011,-1.6463,-1.6367,-0.8885,0.0],"Rmm":[0.0,-1.0344,-1.9135,-1.9896,-1.3679,-0.4347,0.3168,0.5472,0.0,-3.2394,-7.187,-11.2077,-14.5496,-16.4787,-16.544,-14.7281,-11.4515,-7.4256,-3.3918,0.0,0.7115,0.5913,-0.1074,-1.033,-1.6813,-1.6645,-0.901,0.0],"mx":16.493,"mx_x":97.57,"rx":[{"n":"P21-L","ry":520.8},{"n":"P21-R","ry":522.4},{"n":"P22-L","ry":2848.6},{"n":"P22-R","ry":2846.1},{"n":"P23-L","ry":2802.8},{"n":"P23-R","ry":2800.2},{"n":"P24-L","ry":539.4},{"n":"P24-R","ry":541.9}]}},"FD_ops":{"TCL_0":-165.7,"BCL_0":-84.3,"TCL_1":345.3,"BCL_1":-620.3,"TCL_2":730.8,"BCL_2":-964.6,"TCL_3":617.9,"BCL_3":-872.2,"TCL_4":111.1,"BCL_4":-410.8,"TCL_5":-643.2,"BCL_5":281.4,"TCL_6":-1535.2,"BCL_6":1050.8,"TCL_7":-2391.0,"BCL_7":1620.0,"TCL_8":-2241.4,"BCL_8":1895.9,"TCL_9":-1110.4,"BCL_9":1060.5,"TCL_10":-11.4,"BCL_10":74.5,"TCL_11":894.9,"BCL_11":-772.0,"TCL_12":1517.2,"BCL_12":-1346.8,"TCL_13":1745.2,"BCL_13":-1558.2,"TCL_14":1538.8,"BCL_14":-1367.2,"TCL_15":936.1,"BCL_15":-811.1,"TCL_16":45.8,"BCL_16":19.5,"TCL_17":-1041.2,"BCL_17":991.9,"TCL_18":-2160.2,"BCL_18":1813.1,"TCL_19":-2308.0,"BCL_19":1888.4,"TCL_20":-1437.5,"BCL_20":1287.0,"TCL_21":-534.8,"BCL_21":491.0,"TCL_22":227.8,"BCL_22":-222.3,"TCL_23":737.4,"BCL_23":-696.1,"TCL_24":845.0,"BCL_24":-788.8,"TCL_25":445.3,"BCL_25":-428.5,"TCL_26":-119.6,"BCL_26":159.9,"TCR_0":-171.5,"BCR_0":-87.8,"TCR_1":339.2,"BCR_1":-637.7,"TCR_2":728.2,"BCR_2":-994.4,"TCR_3":617.7,"BCR_3":-902.0,"TCR_4":112.7,"BCR_4":-427.8,"TCR_5":-640.7,"BCR_5":287.5,"TCR_6":-1532.3,"BCR_6":1084.7,"TCR_7":-2389.7,"BCR_7":1677.3,"TCR_8":-2241.6,"BCR_8":1955.2,"TCR_9":-1111.2,"BCR_9":1095.2,"TCR_10":-14.1,"BCR_10":76.5,"TCR_11":890.5,"BCR_11":-798.2,"TCR_12":1511.6,"BCR_12":-1391.4,"TCR_13":1739.2,"BCR_13":-1609.2,"TCR_14":1533.5,"BCR_14":-1412.1,"TCR_15":932.3,"BCR_15":-837.8,"TCR_16":43.9,"BCR_16":20.8,"TCR_17":-1040.9,"BCR_17":1026.2,"TCR_18":-2159.3,"BCR_18":1874.6,"TCR_19":-2305.5,"BCR_19":1947.1,"TCR_20":-1433.2,"BCR_20":1324.1,"TCR_21":-530.5,"BCR_21":499.8,"TCR_22":231.5,"BCR_22":-237.0,"TCR_23":739.6,"BCR_23":-723.7,"TCR_24":844.6,"BCR_24":-815.5,"TCR_25":441.0,"BCR_25":-441.4,"TCR_26":-124.6,"BCR_26":162.2,"VL_0":1.6,"D1L_0":-152.2,"D2L_0":91.9,"VR_0":-0.0,"D1R_0":-151.2,"D2R_0":88.1,"VL_1":148.9,"D1L_1":-293.3,"D2L_1":223.7,"VR_1":153.6,"D1R_1":-297.8,"D2R_1":221.1,"VL_2":-122.3,"D1L_2":-100.0,"D2L_2":15.6,"VR_2":-119.9,"D1R_2":-106.2,"D2R_2":11.8,"VL_3":-96.4,"D1L_3":104.8,"D2L_3":-191.6,"VR_3":-92.9,"D1R_3":98.7,"D2R_3":-194.0,"VL_4":-100.4,"D1L_4":278.6,"D2L_4":-391.7,"VR_4":-97.9,"D1R_4":274.7,"D2R_4":-391.7,"VL_5":-99.5,"D1L_5":388.4,"D2L_5":-550.2,"VR_5":-99.0,"D1R_5":387.5,"D2R_5":-547.7,"VL_6":-145.2,"D1L_6":462.1,"D2L_6":-639.2,"VR_6":-147.1,"D1R_6":463.7,"D2R_6":-635.8,"VL_7":-42.1,"D1L_7":533.9,"D2L_7":-292.9,"VR_7":-46.8,"D1R_7":538.6,"D2R_7":-290.5,"VL_8":703.4,"VR_8":701.4,"D1L_8":-456.4,"D2L_8":765.8,"D1R_8":-453.2,"D2R_8":770.0,"VL_9":-89.8,"D1L_9":-777.2,"D2L_9":671.9,"VR_9":-94.3,"D1R_9":-773.7,"D2R_9":672.6,"VL_10":-182.0,"D1L_10":-647.4,"D2L_10":576.4,"VR_10":-183.3,"D1R_10":-645.7,"D2R_10":574.4,"VL_11":-137.6,"D1L_11":-456.2,"D2L_11":447.9,"VR_11":-136.0,"D1R_11":-457.6,"D2R_11":443.1,"VL_12":-141.3,"D1L_12":-230.0,"D2L_12":254.9,"VR_12":-137.1,"D1R_12":-234.3,"D2R_12":248.4,"VL_13":-141.1,"D1L_13":12.8,"D2L_13":25.0,"VR_13":-135.4,"D1R_13":6.7,"D2R_13":18.7,"VL_14":-141.1,"D1L_14":243.6,"D2L_14":-217.7,"VR_14":-135.4,"D1R_14":237.3,"D2R_14":-222.2,"VL_15":-141.3,"D1L_15":438.3,"D2L_15":-444.8,"VR_15":-137.2,"D1R_15":433.7,"D2R_15":-446.3,"VL_16":-137.9,"D1L_16":569.0,"D2L_16":-637.5,"VR_16":-136.2,"D1R_16":567.2,"D2R_16":-635.9,"VL_17":-181.2,"D1L_17":667.2,"D2L_17":-769.8,"VR_17":-182.6,"D1R_17":668.1,"D2R_17":-766.3,"VL_18":-89.7,"D1L_18":754.5,"D2L_18":-453.5,"VR_18":-94.4,"D1R_18":759.3,"D2R_18":-450.3,"VL_19":686.3,"VR_19":684.0,"D1L_19":-285.3,"D2L_19":567.5,"D1R_19":-282.6,"D2R_19":572.3,"VL_20":-72.2,"D1L_20":-623.8,"D2L_20":498.1,"VR_20":-77.2,"D1R_20":-620.0,"D2R_20":500.1,"VL_21":-177.2,"D1L_21":-526.0,"D2L_21":430.1,"VR_21":-179.6,"D1R_21":-523.1,"D2R_21":429.7,"VL_22":-133.8,"D1L_22":-358.5,"D2L_22":323.3,"VR_22":-133.8,"D1R_22":-357.8,"D2R_22":319.9,"VL_23":-135.4,"D1L_23":-149.6,"D2L_23":149.8,"VR_23":-133.5,"D1R_23":-151.1,"D2R_23":144.2,"VL_24":-130.8,"D1L_24":65.2,"D2L_24":-57.2,"VR_24":-127.8,"D1R_24":62.4,"D2R_24":-62.8,"VL_25":-155.4,"D1L_25":277.6,"D2L_25":-256.0,"VR_25":-153.6,"D1R_25":276.3,"D2R_25":-259.9,"VL_26":99.7,"D1L_26":178.7,"D2L_26":-144.3,"VR_26":103.3,"D1R_26":176.9,"D2R_26":-143.3,"VL_27":10.3,"VR_27":8.9},"MAF_ops":2391.0,"MC_ops":-2391.0,"MT_ops":1955.2,"HV_ops":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,-6.9e-07,-1.02e-06,-1.03e-06,-8.8e-07,-6.5e-07,-4e-07,-1.8e-07,0.0,1.2e-07,2.1e-07,2.7e-07,3e-07,2.9e-07,2.6e-07,2e-07,1.5e-07,9e-08,4e-08,0.0,-2e-08,-4e-08,-5e-08,-5e-08,-4e-08,-3e-08,-1e-08,0.0],[0.0,-1.02e-06,-2.17e-06,-2.4e-06,-2.11e-06,-1.58e-06,-9.9e-07,-4.5e-07,0.0,3.1e-07,5.4e-07,6.9e-07,7.6e-07,7.4e-07,6.5e-07,5.2e-07,3.7e-07,2.2e-07,1e-07,0.0,-6e-08,-1e-07,-1.2e-07,-1.2e-07,-1e-07,-6e-08,-3e-08,0.0],[0.0,-1.03e-06,-2.4e-06,-3.28e-06,-3.09e-06,-2.39e-06,-1.53e-06,-7.1e-07,0.0,4.8e-07,8.4e-07,1.08e-06,1.17e-06,1.15e-06,1.01e-06,8.1e-07,5.8e-07,3.5e-07,1.5e-07,0.0,-9e-08,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-1e-07,-4e-08,0.0],[0.0,-8.8e-07,-2.11e-06,-3.09e-06,-3.47e-06,-2.85e-06,-1.87e-06,-8.8e-07,0.0,5.8e-07,1.02e-06,1.31e-06,1.43e-06,1.39e-06,1.23e-06,9.8e-07,7e-07,4.2e-07,1.9e-07,0.0,-1.1e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.2e-07,-5e-08,0.0],[0.0,-6.5e-07,-1.58e-06,-2.39e-06,-2.85e-06,-2.79e-06,-1.94e-06,-9.3e-07,0.0,5.9e-07,1.03e-06,1.32e-06,1.44e-06,1.4e-06,1.24e-06,9.9e-07,7e-07,4.3e-07,1.9e-07,0.0,-1.1e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.2e-07,-5e-08,0.0],[0.0,-4e-07,-9.9e-07,-1.53e-06,-1.87e-06,-1.94e-06,-1.68e-06,-8.5e-07,0.0,4.9e-07,8.5e-07,1.08e-06,1.18e-06,1.15e-06,1.02e-06,8.1e-07,5.8e-07,3.5e-07,1.5e-07,0.0,-9e-08,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-1e-07,-4e-08,0.0],[0.0,-1.8e-07,-4.5e-07,-7.1e-07,-8.8e-07,-9.3e-07,-8.5e-07,-6.3e-07,0.0,2.9e-07,5e-07,6.4e-07,6.9e-07,6.7e-07,6e-07,4.8e-07,3.4e-07,2.1e-07,9e-08,0.0,-5e-08,-9e-08,-1.1e-07,-1.1e-07,-9e-08,-6e-08,-2e-08,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,1.2e-07,3.1e-07,4.8e-07,5.8e-07,5.9e-07,4.9e-07,2.9e-07,0.0,-7.1e-07,-9.8e-07,-1.14e-06,-1.19e-06,-1.13e-06,-9.9e-07,-7.9e-07,-5.6e-07,-3.5e-07,-1.6e-07,0.0,1e-07,1.6e-07,2e-07,2e-07,1.7e-07,1.1e-07,5e-08,0.0],[0.0,2.1e-07,5.4e-07,8.4e-07,1.02e-06,1.03e-06,8.5e-07,5e-07,0.0,-9.8e-07,-1.98e-06,-2.39e-06,-2.54e-06,-2.46e-06,-2.17e-06,-1.74e-06,-1.26e-06,-7.8e-07,-3.5e-07,0.0,2.2e-07,3.8e-07,4.7e-07,4.7e-07,3.9e-07,2.6e-07,1.1e-07,0.0],[0.0,2.7e-07,6.9e-07,1.08e-06,1.31e-06,1.32e-06,1.08e-06,6.4e-07,0.0,-1.14e-06,-2.39e-06,-3.53e-06,-3.91e-06,-3.85e-06,-3.45e-06,-2.81e-06,-2.05e-06,-1.28e-06,-5.9e-07,0.0,3.8e-07,6.4e-07,7.8e-07,7.9e-07,6.6e-07,4.4e-07,1.8e-07,0.0],[0.0,3e-07,7.6e-07,1.17e-06,1.43e-06,1.44e-06,1.18e-06,6.9e-07,0.0,-1.19e-06,-2.54e-06,-3.91e-06,-4.98e-06,-5.11e-06,-4.68e-06,-3.87e-06,-2.86e-06,-1.8e-06,-8.3e-07,0.0,5.4e-07,9.2e-07,1.12e-06,1.12e-06,9.4e-07,6.2e-07,2.6e-07,0.0],[0.0,2.9e-07,7.4e-07,1.15e-06,1.39e-06,1.4e-06,1.15e-06,6.7e-07,0.0,-1.13e-06,-2.46e-06,-3.85e-06,-5.11e-06,-5.89e-06,-5.61e-06,-4.74e-06,-3.55e-06,-2.27e-06,-1.05e-06,0.0,6.8e-07,1.16e-06,1.41e-06,1.41e-06,1.18e-06,7.9e-07,3.3e-07,0.0],[0.0,2.6e-07,6.5e-07,1.01e-06,1.23e-06,1.24e-06,1.02e-06,6e-07,0.0,-9.9e-07,-2.17e-06,-3.45e-06,-4.68e-06,-5.61e-06,-5.96e-06,-5.23e-06,-4e-06,-2.6e-06,-1.22e-06,0.0,7.7e-07,1.32e-06,1.61e-06,1.61e-06,1.35e-06,9e-07,3.7e-07,0.0],[0.0,2e-07,5.2e-07,8.1e-07,9.8e-07,9.9e-07,8.1e-07,4.8e-07,0.0,-7.9e-07,-1.74e-06,-2.81e-06,-3.87e-06,-4.74e-06,-5.23e-06,-5.15e-06,-4.09e-06,-2.71e-06,-1.29e-06,0.0,8e-07,1.36e-06,1.66e-06,1.66e-06,1.39e-06,9.3e-07,3.8e-07,0.0],[0.0,1.5e-07,3.7e-07,5.8e-07,7e-07,7e-07,5.8e-07,3.4e-07,0.0,-5.6e-07,-1.26e-06,-2.05e-06,-2.86e-06,-3.55e-06,-4e-06,-4.09e-06,-3.72e-06,-2.56e-06,-1.23e-06,0.0,7.4e-07,1.25e-06,1.53e-06,1.53e-06,1.28e-06,8.5e-07,3.5e-07,0.0],[0.0,9e-08,2.2e-07,3.5e-07,4.2e-07,4.3e-07,3.5e-07,2.1e-07,0.0,-3.5e-07,-7.8e-07,-1.28e-06,-1.8e-06,-2.27e-06,-2.6e-06,-2.71e-06,-2.56e-06,-2.11e-06,-1.06e-06,0.0,5.8e-07,9.8e-07,1.2e-06,1.2e-06,1e-06,6.7e-07,2.8e-07,0.0],[0.0,4e-08,1e-07,1.5e-07,1.9e-07,1.9e-07,1.5e-07,9e-08,0.0,-1.6e-07,-3.5e-07,-5.9e-07,-8.3e-07,-1.05e-06,-1.22e-06,-1.29e-06,-1.23e-06,-1.06e-06,-7.5e-07,0.0,3.4e-07,5.6e-07,6.8e-07,6.8e-07,5.7e-07,3.8e-07,1.6e-07,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.0,-2e-08,-6e-08,-9e-08,-1.1e-07,-1.1e-07,-9e-08,-5e-08,0.0,1e-07,2.2e-07,3.8e-07,5.4e-07,6.8e-07,7.7e-07,8e-07,7.4e-07,5.8e-07,3.4e-07,0.0,-6.8e-07,-9.3e-07,-1.02e-06,-9.8e-07,-8e-07,-5.2e-07,-2.1e-07,0.0],[0.0,-4e-08,-1e-07,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-9e-08,0.0,1.6e-07,3.8e-07,6.4e-07,9.2e-07,1.16e-06,1.32e-06,1.36e-06,1.25e-06,9.8e-07,5.6e-07,0.0,-9.3e-07,-1.82e-06,-2.1e-06,-2.05e-06,-1.69e-06,-1.12e-06,-4.6e-07,0.0],[0.0,-5e-08,-1.2e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.1e-07,0.0,2e-07,4.7e-07,7.8e-07,1.12e-06,1.41e-06,1.61e-06,1.66e-06,1.53e-06,1.2e-06,6.8e-07,0.0,-1.02e-06,-2.1e-06,-3e-06,-3.07e-06,-2.59e-06,-1.74e-06,-7.2e-07,0.0],[0.0,-5e-08,-1.2e-07,-1.8e-07,-2.2e-07,-2.2e-07,-1.8e-07,-1.1e-07,0.0,2e-07,4.7e-07,7.9e-07,1.12e-06,1.41e-06,1.61e-06,1.66e-06,1.53e-06,1.2e-06,6.8e-07,0.0,-9.8e-07,-2.05e-06,-3.07e-06,-3.71e-06,-3.31e-06,-2.28e-06,-9.7e-07,0.0],[0.0,-4e-08,-1e-07,-1.5e-07,-1.8e-07,-1.8e-07,-1.5e-07,-9e-08,0.0,1.7e-07,3.9e-07,6.6e-07,9.4e-07,1.18e-06,1.35e-06,1.39e-06,1.28e-06,1e-06,5.7e-07,0.0,-8e-07,-1.69e-06,-2.59e-06,-3.31e-06,-3.49e-06,-2.56e-06,-1.11e-06,0.0],[0.0,-3e-08,-6e-08,-1e-07,-1.2e-07,-1.2e-07,-1e-07,-6e-08,0.0,1.1e-07,2.6e-07,4.4e-07,6.2e-07,7.9e-07,9e-07,9.3e-07,8.5e-07,6.7e-07,3.8e-07,0.0,-5.2e-07,-1.12e-06,-1.74e-06,-2.28e-06,-2.56e-06,-2.3e-06,-1.08e-06,0.0],[0.0,-1e-08,-3e-08,-4e-08,-5e-08,-5e-08,-4e-08,-2e-08,0.0,5e-08,1.1e-07,1.8e-07,2.6e-07,3.3e-07,3.7e-07,3.8e-07,3.5e-07,2.8e-07,1.6e-07,0.0,-2.1e-07,-4.6e-07,-7.2e-07,-9.7e-07,-1.11e-06,-1.08e-06,-7.3e-07,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]],"HVsup_ops":[[-1.0,-0.915032,-0.777198,-0.622848,-0.46704,-0.322587,-0.196303,-0.089665,-0.0,0.072051,0.127688,0.163657,0.178795,0.174405,0.154017,0.123004,0.087429,0.052823,0.023095,-0.0,-0.013048,-0.02212,-0.026946,-0.027036,-0.022695,-0.015136,-0.006281,-0.0],[-0.0,-0.101,-0.263419,-0.439911,-0.608137,-0.751014,-0.860747,-0.937331,-0.986157,-1.0,-0.984362,-0.934684,-0.851142,-0.738639,-0.605928,-0.464367,-0.325468,-0.198736,-0.089836,-0.0,0.060871,0.104382,0.127221,0.127545,0.106961,0.07131,0.029617,-0.0],[-0.0,0.021909,0.055881,0.08682,0.105364,0.105895,0.087047,0.050752,-0.0,-0.077926,-0.175859,-0.29367,-0.426384,-0.565134,-0.698835,-0.816196,-0.908169,-0.969309,-0.998811,-1.0,-0.963477,-0.8951,-0.78894,-0.645133,-0.471895,-0.286852,-0.112275,-0.0],[-0.0,-0.004542,-0.01152,-0.017829,-0.021587,-0.021673,-0.017834,-0.010545,-0.0,0.019836,0.046195,0.07759,0.110396,0.139423,0.158933,0.163784,0.150535,0.117844,0.066728,-0.0,-0.085138,-0.188532,-0.313024,-0.45708,-0.613791,-0.77025,-0.911541,-1.0]],"HVR_ops":[[-0.5,-0.0,-0.0,-0.0],[-0.45751609,-0.05120897,0.01095444,-0.00227099],[-0.38859876,-0.13355824,0.02794043,-0.00576015],[-0.31142392,-0.22304334,0.04341001,-0.0089147],[-0.23351979,-0.30833684,0.05268222,-0.01079344],[-0.16129368,-0.38077794,0.05294757,-0.01083675],[-0.09815146,-0.43641507,0.04352349,-0.00891689],[-0.04483243,-0.47524439,0.02537614,-0.0052726],[-0.0,-0.5,-0.0,-0.0],[0.03602528,-0.50701871,-0.03896319,0.00991817],[0.06384412,-0.49909002,-0.08792943,0.02309745],[0.08182834,-0.47390236,-0.14683506,0.03879511],[0.08939748,-0.43154488,-0.21319212,0.05519782],[0.08720233,-0.37450397,-0.28256725,0.06971137],[0.07700841,-0.30721688,-0.34941726,0.07946641],[0.06150192,-0.23544255,-0.40809818,0.08189219],[0.0437145,-0.16501812,-0.45408468,0.07526775],[0.02641144,-0.1007631,-0.4846543,0.05892185],[0.01154749,-0.04554834,-0.49940547,0.03336405],[-0.0,-0.0,-0.5,-0.0],[-0.00652421,0.03086272,-0.48173852,-0.04256906],[-0.01106009,0.05292373,-0.44755012,-0.09426623],[-0.01347302,0.06450333,-0.39447002,-0.15651179],[-0.01351799,0.06466795,-0.32256655,-0.2285402],[-0.01134744,0.05423127,-0.23594738,-0.30689563],[-0.00756801,0.03615573,-0.14342613,-0.38512486],[-0.00314073,0.01501629,-0.05613771,-0.4557706],[-0.0,-0.0,-0.0,-0.5]],"eig_ops":{"V":[{"f":4.0968,"T":0.2441,"d":[0.0,-0.083351,-0.203843,-0.302949,-0.350818,-0.335711,-0.262838,-0.146753,0.0,0.212811,0.448734,0.682001,0.875321,0.989872,1.0,0.902869,0.719205,0.484662,0.235578,0.0,-0.174451,-0.313398,-0.401706,-0.423096,-0.370814,-0.256177,-0.109052,0.0]},{"f":6.811,"T":0.1468,"d":[0.0,-0.282581,-0.647664,-0.890867,-0.941368,-0.808882,-0.560806,-0.272537,0.0,0.188831,0.31205,0.351011,0.296945,0.1653,-0.004772,-0.160761,-0.255099,-0.259195,-0.170027,0.0,0.28306,0.586951,0.852444,1.0,0.955709,0.704148,0.312648,0.0]},{"f":7.937,"T":0.126,"d":[0.0,0.342031,0.758991,1.0,0.9982,0.794832,0.498225,0.210678,0.0,0.019942,0.128276,0.289554,0.454229,0.561208,0.569208,0.475637,0.317598,0.154358,0.036336,0.0,0.180969,0.433839,0.69848,0.883686,0.891161,0.681085,0.309321,0.0]},{"f":12.5611,"T":0.0796,"d":[0.0,-0.187836,-0.362058,-0.375785,-0.241526,-0.053128,0.081495,0.105575,0.0,-0.432974,-0.828432,-1.0,-0.827187,-0.327041,0.310128,0.815715,0.996417,0.830966,0.436648,0.0,-0.109547,-0.083228,0.058536,0.254114,0.390053,0.370681,0.189294,0.0]},{"f":18.6174,"T":0.0537,"d":[0.0,-0.484669,-0.783744,-0.499541,0.127309,0.631218,0.727819,0.444981,0.0,-0.252304,-0.326921,-0.183536,0.105571,0.35192,0.382344,0.178017,-0.110274,-0.284423,-0.245329,0.0,0.564383,0.933898,0.818615,0.176504,-0.63032,-1.0,-0.619772,0.0]},{"f":19.1179,"T":0.0523,"d":[0.0,0.627471,1.0,0.603541,-0.22396,-0.859185,-0.947036,-0.551453,0.0,0.021007,-0.099888,-0.238788,-0.281633,-0.161496,0.061829,0.246057,0.284265,0.188202,0.04874,0.0,0.429517,0.748971,0.688943,0.191134,-0.46739,-0.788424,-0.497304,0.0]}],"L":[{"f":0.2893,"T":3.456,"d":[0.0,0.114187,0.226883,0.336621,0.441972,0.541561,0.634088,0.718348,0.793243,0.860313,0.915188,0.957092,0.985431,0.999801,1.0,0.986025,0.958074,0.916543,0.862021,0.795281,0.720384,0.636028,0.543318,0.443472,0.337802,0.227697,0.1146,0.0]},{"f":1.1573,"T":0.8641,"d":[0.0,-0.2266,-0.441418,-0.633292,-0.79225,-0.910027,-0.980497,-1.0,-0.967518,-0.880143,-0.743053,-0.563988,-0.353065,-0.1222,0.11557,0.346809,0.55846,0.738563,0.876945,0.965793,0.999808,0.981471,0.911744,0.794277,0.635222,0.442911,0.227407,0.0]},{"f":2.6036,"T":0.3841,"d":[0.0,0.339509,0.639526,0.86516,0.990167,1.0,0.89351,0.683073,0.393143,0.042656,-0.313237,-0.629572,-0.866371,-0.99371,-0.995503,-0.871523,-0.637433,-0.322812,0.032577,0.383835,0.676555,0.889974,0.999109,0.991185,0.867134,0.641497,0.340703,0.0]},{"f":4.6301,"T":0.216,"d":[0.0,-0.442681,-0.794506,-0.983276,-0.970244,-0.758073,-0.390303,0.057604,0.493744,0.839605,0.99853,0.935045,0.663243,0.243664,-0.230231,-0.652844,-0.930021,-1.0,-0.847211,-0.50574,-0.06958,0.380944,0.752705,0.968848,0.984678,0.796925,0.444401,0.0]},{"f":7.2333,"T":0.1382,"d":[0.0,0.545431,0.917681,0.998575,0.762434,0.284253,-0.284103,-0.762132,-0.997978,-0.906497,-0.503077,0.073455,0.62458,0.960503,0.965551,0.637996,0.09065,-0.487978,-0.898637,-1.0,-0.771636,-0.296334,0.273826,0.756469,0.997212,0.919056,0.546987,0.0]},{"f":10.4102,"T":0.0961,"d":[-0.0,0.63573,0.984343,0.888425,0.391318,-0.28242,-0.828427,-1.0,-0.719396,-0.084131,0.592206,0.978684,0.886218,0.36012,-0.342142,-0.876915,-0.982568,-0.607444,0.064857,0.705394,0.997836,0.836032,0.293852,-0.382047,-0.884274,-0.984458,-0.637045,-0.0]}],"T":[{"f":0.1929,"T":5.184,"d":[0.0,0.114187,0.226883,0.336621,0.441972,0.541561,0.634088,0.718348,0.793243,0.860313,0.915188,0.957092,0.985431,0.999801,1.0,0.986025,0.958074,0.916543,0.862021,0.795281,0.720384,0.636028,0.543318,0.443472,0.337802,0.227697,0.1146,0.0]},{"f":0.7715,"T":1.2962,"d":[0.0,-0.2266,-0.441418,-0.633292,-0.79225,-0.910027,-0.980497,-1.0,-0.967518,-0.880143,-0.743053,-0.563988,-0.353065,-0.1222,0.11557,0.346809,0.55846,0.738563,0.876945,0.965793,0.999808,0.981471,0.911744,0.794277,0.635222,0.442911,0.227407,0.0]},{"f":1.7358,"T":0.5761,"d":[0.0,0.339509,0.639526,0.86516,0.990167,1.0,0.89351,0.683073,0.393143,0.042656,-0.313237,-0.629572,-0.866371,-0.99371,-0.995503,-0.871523,-0.637433,-0.322812,0.032577,0.383835,0.676555,0.889974,0.999109,0.991185,0.867134,0.641497,0.340703,0.0]},{"f":3.0868,"T":0.324,"d":[0.0,-0.442681,-0.794506,-0.983276,-0.970244,-0.758073,-0.390303,0.057604,0.493744,0.839605,0.99853,0.935045,0.663243,0.243664,-0.230231,-0.652844,-0.930021,-1.0,-0.847211,-0.50574,-0.06958,0.380944,0.752705,0.968848,0.984678,0.796925,0.444401,0.0]},{"f":4.8222,"T":0.2074,"d":[0.0,0.545431,0.917681,0.998575,0.762434,0.284253,-0.284103,-0.762132,-0.997978,-0.906497,-0.503077,0.073455,0.62458,0.960503,0.965551,0.637996,0.09065,-0.487978,-0.898637,-1.0,-0.771636,-0.296334,0.273826,0.756469,0.997212,0.919056,0.546987,0.0]},{"f":6.9401,"T":0.1441,"d":[-0.0,0.63573,0.984343,0.888425,0.391318,-0.28242,-0.828427,-1.0,-0.719396,-0.084131,0.592206,0.978684,0.886218,0.36012,-0.342142,-0.876915,-0.982568,-0.607444,0.064857,0.705394,0.997836,0.836032,0.293852,-0.382047,-0.884274,-0.984458,-0.637045,-0.0]}]},"js_mm":34.52,"py_mm":14.62,"ops_mm":14.68,"cross_err":0.4,"W_DL":32.0,"W_LLS":13.786,"TN":168,"TM":552,"TN_ops":168,"TM_ops":552};
+</script>
+
+<script>
+const D=DATA;
+const PX=D.panelX,NTN=D.NTN,TOT=D.TOT,WTR=D.W_TR,SP=D.SPANS,VL=D.VEH_LEN,NM=D.N_MODES;
+const NC=D.NC,ML=D.ML;
+const SUP_XA=[0,SP[0],SP[0]+SP[1],TOT];
+const SUP_SET=new Set([0,D.SUP_IDX[1],D.SUP_IDX[2],NTN-1]);
+
+// ── 결과소스 토글 ─────────────────────────────────────────────────
+let SRC='pynite'; // 'pynite' | 'opensees'
+function getRES(){ return SRC==='pynite' ? D.results    : D.results_ops; }
+function getFD() { return SRC==='pynite' ? D.FD         : D.FD_ops;      }
+function getMAF(){ return SRC==='pynite' ? D.MAF        : D.MAF_ops;     }
+function getHV() { return SRC==='pynite' ? D.HV         : D.HV_ops;      }
+function getHVs(){ return SRC==='pynite' ? D.HVsup      : D.HVsup_ops;   }
+function getHVR(){ return SRC==='pynite' ? D.HVR_RAW    : D.HVR_ops;     }
+function getEIG(){ return SRC==='pynite' ? D.eig        : D.eig_ops;     }
+
+window.setSRC=function(src){
+  SRC=src;
+  // 버튼 스타일
+  document.getElementById('src-py').classList.toggle('on', src==='pynite');
+  document.getElementById('src-ops').classList.toggle('on', src==='opensees');
+  // 배너 업데이트
+  const isPy=src==='pynite';
+  const dot=document.getElementById('src-dot');
+  document.getElementById('src-name').textContent=isPy?'PyNite 3D FEM':'OpenSeesPy 3D FEM';
+  document.getElementById('src-desc').textContent=
+    isPy?`절점 ${D.TN} | 부재 ${D.TM}`:`절점 ${D.TN_ops} | 부재 ${D.TM_ops}`;
+  dot.style.background=isPy?'#60a5fa':'#34d399';
+  dot.style.boxShadow=isPy?'0 0 6px #3b82f6':'0 0 6px #10b981';
+  // 푸터 소스명
+  const ft=document.getElementById('ft-src');
+  if(ft){ft.textContent=isPy?'PyNite 3D':'OpenSeesPy 3D';
+    ft.style.color=isPy?'#60a5fa':'#34d399';}
+  // 절점·부재수
+  document.getElementById('ft-n').textContent=isPy?D.TN:D.TN_ops;
+  document.getElementById('ft-m').textContent=isPy?D.TM:D.TM_ops;
+  // 반력표 갱신
+  updRxTable();
+  // 현재 상태 갱신
+  maxMV=0; updCD(); draw();
+  if(AM==='eig') updEigTable();
+  if(DM==='force') drawForceLegend();
+};
+
+function updRxTable(){
+  const rx=getRES()?.SER_I?.rx||[];
+  const tb=document.getElementById('rx-tbody'); if(!tb) return;
+  tb.innerHTML=rx.map(r=>`<tr><td>${r.n}</td><td style="text-align:right">${Math.round(r.ry)}</td></tr>`).join('');
+}
+
+let LC='SER_I',SC=200,DM='defl',AM='static';
+let tX=-VL,tSpd=80,playing=false,tLast=null,maxMV=0;
+let ES={tp:'V',mi:0,anim:true,ph:0,amp:8,aid:null,lt:null};
+let SV=[0,0,0,0,0,0,0,0];
+let CD=new Array(NTN).fill(0);
+let CD_L=new Array(NTN).fill(0);
+let CD_R=new Array(NTN).fill(0);
+const LY={truss:true,brace:true,floor:true,ghost:true,deform:true,support:true,pier:true};
+let cam={rx:-22,ry:-32,tx:0,ty:10,zoom:1.0,mode:'persp'};
+let drag={on:false,btn:0,lx:0,ly:0};
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),cw=document.querySelector('.cv');
+
+// 초기화
+document.getElementById('ft-n').textContent=D.TN;
+document.getElementById('ft-m').textContent=D.TM;
+document.getElementById('sv-f').textContent=(getEIG().V[0]?.f||0).toFixed(3)+'Hz';
+updRxTable();
+
+function lp(a,b,t){return Math.round(a*(1-t)+b*t);}
+function hA(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),bv=parseInt(h.slice(5,7),16);return`rgba(${r},${g},${bv},${a})`;}
+function proj(x,y,z){
+  const cx=x-TOT/2,cy=y-3,cz=z-WTR/2;
+  const rx=cam.rx*Math.PI/180,ry=cam.ry*Math.PI/180,sc=5.5;
+  if(cam.mode==='front')return{px:cx*sc,py:-cy*sc*1.5,d:cz};
+  if(cam.mode==='top')  return{px:cx*sc,py:cz*22,d:-cy};
+  if(cam.mode==='side') return{px:-cz*24,py:-cy*sc*1.5,d:cx};
+  let x1=cx*Math.cos(ry)-cz*Math.sin(ry),z1=cx*Math.sin(ry)+cz*Math.cos(ry);
+  let y1=cy*Math.cos(rx)-z1*Math.sin(rx),z2=cy*Math.sin(rx)+z1*Math.cos(rx);
+  const fov=1100,dz=Math.max(fov+z2*5,80);
+  return{px:x1*sc*(fov/dz),py:-y1*sc*(fov/dz),d:z2};
+}
+function dCol(dy,dm){
+  if(dm<1e-9)return'#1e90ff';
+  const t=Math.min(1,Math.abs(dy)/dm);
+  if(t<.25){const f=t/.25;return`rgb(${lp(30,0,f)},${lp(100,220,f)},${lp(255,255,f)})`;}
+  if(t<.50){const f=(t-.25)/.25;return`rgb(${lp(0,0,f)},${lp(220,255,f)},${lp(255,80,f)})`;}
+  if(t<.75){const f=(t-.5)/.25;return`rgb(${lp(0,220,f)},${lp(255,255,f)},${lp(80,0,f)})`;}
+  const f=(t-.75)/.25;return`rgb(${lp(220,255,f)},${lp(255,40,f)},${lp(0,40,f)})`;
+}
+function fCol(ax){
+  // 인장(+) → 파랑 계열  /  압축(-) → 빨강 계열  /  무력(≈0) → 회색
+  const maf=getMAF(); if(maf<1e-3) return '#2a3a4a';
+  const ratio=ax/maf;
+  if(Math.abs(ratio)<0.04) return '#2a3a4a';
+  if(ratio>0){
+    const f=Math.min(1,ratio);
+    if(f<0.4){const g=f/0.4;  return`rgb(${lp(20,20,g)},${lp(60,140,g)},${lp(120,255,g)})`;}
+    if(f<0.75){const g=(f-0.4)/0.35; return`rgb(${lp(20,80,g)},${lp(140,200,g)},${lp(255,255,g)})`;}
+    const g=(f-0.75)/0.25; return`rgb(${lp(80,220,g)},${lp(200,235,g)},${lp(255,255,g)})`;
+  }else{
+    const f=Math.min(1,-ratio);
+    if(f<0.4){const g=f/0.4;  return`rgb(${lp(100,220,g)},${lp(30,40,g)},${lp(20,20,g)})`;}
+    if(f<0.75){const g=(f-0.4)/0.35; return`rgb(${lp(220,255,g)},${lp(40,60,g)},${lp(20,20,g)})`;}
+    const g=(f-0.75)/0.25; return`rgb(${lp(255,255,g)},${lp(60,180,g)},${lp(20,80,g)})`;
+  }
+}
+function mvDefl(tx){
+  const x0=Math.max(0,tx-VL),x1=Math.min(TOT,tx);
+  const d=new Array(NTN).fill(0);
+  const HV=getHV();
+  if(x1>x0){
+    for(let i=0;i<NTN;i++)
+      for(let j=0;j<NTN;j++){
+        const xj=PX[j];
+        if(xj>=x0&&xj<=x1){
+          const dl=j>0?(PX[j]-PX[j-1])/2:0,dr=j<NTN-1?(PX[j+1]-PX[j])/2:0;
+          d[i]+=HV[i][j]*D.W_LLS*(dl+dr);
+        }
+      }
+  }
+  return d;
+}
+function stDefl(){
+  const supIdx=[0,D.SUP_IDX[1],D.SUP_IDX[2],NTN-1];
+  const svL=[SV[0]/1000,SV[2]/1000,SV[4]/1000,SV[6]/1000];
+  const svR=[SV[1]/1000,SV[3]/1000,SV[5]/1000,SV[7]/1000];
+  const dL=new Array(NTN).fill(0),dR=new Array(NTN).fill(0);
+  for(let sp=0;sp<3;sp++){
+    const i0=supIdx[sp],i1=supIdx[sp+1],x0=PX[i0],x1=PX[i1];
+    for(let i=i0;i<=i1;i++){
+      const t=(PX[i]-x0)/(x1-x0);
+      dL[i]=-(svL[sp]*(1-t)+svL[sp+1]*t);
+      dR[i]=-(svR[sp]*(1-t)+svR[sp+1]*t);
+    }
+  }
+  return {dL,dR};
+}
+function updCD(){
+  const RES=getRES();
+  if(AM==='static'){CD=RES[LC].mm.map(v=>v/1000);CD_L=RES[LC].Lmm.map(v=>v/1000);CD_R=RES[LC].Rmm.map(v=>v/1000);}
+  else if(AM==='moving'){CD=mvDefl(tX);CD_L=[...CD];CD_R=[...CD];}
+  else if(AM==='settle'){
+    const {dL,dR}=stDefl();
+    const base=RES.SER_I.mm.map(v=>v/1000);
+    CD_L=base.map((v,i)=>v+dL[i]);CD_R=base.map((v,i)=>v+dR[i]);
+    CD=CD_L.map((v,i)=>(v+CD_R[i])/2);
+  }else{CD=RES[LC].mm.map(v=>v/1000);CD_L=RES[LC].Lmm.map(v=>v/1000);CD_R=RES[LC].Rmm.map(v=>v/1000);}
+}
+
+function draw(){
+  const W=cv.width,H=cv.height,OX=W/2+cam.tx,OY=H/2+cam.ty,Z=cam.zoom;
+  ctx.clearRect(0,0,W,H);
+  const bg=ctx.createRadialGradient(W/2,H*.4,0,W/2,H*.4,Math.max(W,H)*.75);
+  bg.addColorStop(0,'#0c1222');bg.addColorStop(1,'#07090f');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.012)';ctx.lineWidth=1;
+  for(let gx=0;gx<W;gx+=55){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+  for(let gy=0;gy<H;gy+=55){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+  drawRiver(OX,OY,Z);
+  if(LY.pier)    drawPiers(OX,OY,Z);
+  if(LY.ghost)   drawMem(OX,OY,Z,false);
+  if(LY.deform)  drawMem(OX,OY,Z,true);
+  if(AM==='eig') drawEigMode(OX,OY,Z);
+  if(AM==='moving'&&tX>-VL&&tX<TOT+20) drawTrain(OX,OY,Z);
+  if(LY.support) drawSup(OX,OY,Z);
+  drawRxLbl(OX,OY,Z);drawDims(OX,OY,Z,W,H);drawAxes(W,H);drawSpanBar(W,H);
+  updPanel();
+}
+
+function drawMem(OX,OY,Z,def){
+  const dm=Math.max(...CD.map(Math.abs),1e-9);
+  const dl=[];
+  let eigDisp=null;
+  if(def&&AM==='eig'){
+    const m=getEIG()[ES.tp][ES.mi];
+    if(m){const sc=Math.sin(ES.ph)*ES.amp*0.35;eigDisp={d:m.d,sc,tp:ES.tp};}
+  }
+  for(const m of ML){
+    if(!LY[m[5]])continue;
+    const a=NC[m[0]],bv=NC[m[1]];if(!a||!bv)continue;
+    const mA=m[0].match(/\d+$/),mB=m[1].match(/\d+$/);
+    const iA=mA?Math.min(parseInt(mA[0]),NTN-1):0,iB=mB?Math.min(parseInt(mB[0]),NTN-1):0;
+    let ay=a[1],by=bv[1],az=a[2],bz=bv[2];
+    if(def){
+      if(eigDisp){
+        const isSupA=SUP_SET.has(iA)&&(m[0].startsWith('BC'));
+        const isSupB=SUP_SET.has(iB)&&(m[1].startsWith('BC'));
+        const dA=eigDisp.d[iA]*eigDisp.sc,dB=eigDisp.d[iB]*eigDisp.sc;
+        if(eigDisp.tp==='V'){if(!isSupA)ay=a[1]+dA;if(!isSupB)by=bv[1]+dB;}
+        else if(eigDisp.tp==='L'){if(!isSupA)az=a[2]+dA;if(!isSupB)bz=bv[2]+dB;}
+        else{const sA=m[0].includes('L')?1:-1,sB=m[1].includes('L')?1:-1;
+          if(!isSupA)ay=a[1]+dA*sA;if(!isSupB)by=bv[1]+dB*sB;}
+      }else{
+        const isLeftA=m[0].includes('L')||m[0].startsWith('R0');
+        const isLeftB=m[1].includes('L')||m[1].startsWith('R0');
+        const cdA=(isLeftA?CD_L:CD_R)[iA]||0,cdB=(isLeftB?CD_L:CD_R)[iB]||0;
+        ay=a[1]+cdA*SC;by=bv[1]+cdB*SC;
+      }
+    }
+    const pa=proj(a[0],ay,az),pb=proj(bv[0],by,bz);
+    dl.push({m,iA,iB,pa,pb,d:(pa.d+pb.d)/2});
+  }
+  dl.sort((x,y)=>y.d-x.d);
+  for(const {m,iA,iB,pa,pb} of dl){
+    const x0=OX+pa.px*Z,y0=OY+pa.py*Z,x1=OX+pb.px*Z,y1=OY+pb.py*Z;
+    if(def){
+      let col;
+      if(AM==='eig'){
+        const m_obj=getEIG()[ES.tp][ES.mi];
+        const dVal=m_obj?((m_obj.d[iA]||0)+(m_obj.d[iB]||0))/2:0;
+        col=dCol(dVal*Math.sin(ES.ph),1.0);
+      }else if(DM==='force'&&AM==='static'){
+        const s=m[0].includes('L')?'L':'R';
+        const tp=m[2];
+        const fk=tp==='TC'?`TC${s}_${iA}`:tp==='BC'?`BC${s}_${iA}`:tp==='D'?`D1${s}_${iA}`:tp==='V'?`V${s}_${iA}`:'';
+        col=fCol(getFD()[fk]||0);
+      }else col=dCol(((CD_L[iA]||0)+(CD_R[iA]||0)+(CD_L[iB]||0)+(CD_R[iB]||0))/4,dm);
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);
+      ctx.strokeStyle=col;ctx.lineWidth=m[4]*Z*.5;ctx.lineCap='round';ctx.stroke();
+      if(m[2]==='TC'||m[2]==='BC'){
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);
+        ctx.globalAlpha=.07;ctx.strokeStyle=col;ctx.lineWidth=m[4]*Z*4;ctx.stroke();ctx.globalAlpha=1;
+      }
+    }else{
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);
+      ctx.strokeStyle=hA(m[3],.11);ctx.lineWidth=m[4]*Z*.38;ctx.lineCap='round';ctx.stroke();
+    }
+  }
+}
+function drawRiver(OX,OY,Z){
+  const wl=proj(-5,-2,WTR/2),wr=proj(TOT+5,-2,WTR/2);
+  const wx0=OX+wl.px*Z,wy0=OY+wl.py*Z,wx1=OX+wr.px*Z,wy1=OY+wr.py*Z;
+  const g=ctx.createLinearGradient(wx0,wy0,wx1,wy1);
+  g.addColorStop(0,'rgba(10,35,65,.5)');g.addColorStop(.5,'rgba(12,45,80,.5)');g.addColorStop(1,'rgba(10,35,65,.5)');
+  ctx.beginPath();ctx.moveTo(wx0,wy0);ctx.lineTo(wx1,wy1);ctx.lineTo(wx1,wy1+120);ctx.lineTo(wx0,wy0+120);ctx.closePath();
+  ctx.fillStyle=g;ctx.fill();
+}
+function drawPiers(OX,OY,Z){
+  for(let pi=1;pi<=2;pi++){
+    const px2=SUP_XA[pi];
+    for(const pz of [WTR*.28,WTR*.72]){
+      const top=proj(px2,-.4,pz),bot=proj(px2,-10,pz);
+      const tx=OX+top.px*Z,ty=OY+top.py*Z,bx=OX+bot.px*Z,by=OY+bot.py*Z,r=Math.max(4,1.1*Z*.6);
+      ctx.beginPath();ctx.moveTo(tx-r,ty);ctx.lineTo(bx-r,by);ctx.lineTo(bx+r,by);ctx.lineTo(tx+r,ty);ctx.closePath();
+      const pg=ctx.createLinearGradient(tx-r,ty,tx+r,ty);
+      pg.addColorStop(0,'rgba(100,120,140,.55)');pg.addColorStop(.4,'rgba(160,180,200,.65)');pg.addColorStop(1,'rgba(80,100,120,.4)');
+      ctx.fillStyle=pg;ctx.fill();ctx.strokeStyle='rgba(180,200,220,.25)';ctx.lineWidth=1;ctx.stroke();
+    }
+    const cL=proj(px2,-.4,WTR*.28),cR=proj(px2,-.4,WTR*.72);
+    ctx.beginPath();ctx.moveTo(OX+cL.px*Z,OY+cL.py*Z);ctx.lineTo(OX+cR.px*Z,OY+cR.py*Z);
+    ctx.strokeStyle='rgba(150,170,190,.5)';ctx.lineWidth=5*Z*.4;ctx.stroke();
+  }
+}
+function drawSup(OX,OY,Z){
+  const SN=['P21','P22','P23','P24'],ST=['PIN','ROLL','ROLL','ROLLER'],SC2=['#f87171','#fb923c','#fb923c','#34d399'];
+  D.SUP_IDX.forEach((si,k)=>{
+    const x=PX[si];
+    for(const zs of [0,WTR]){
+      const p=proj(x,-.5,zs),px2=OX+p.px*Z,py2=OY+p.py*Z,sc=Math.max(.5,Z*.5);
+      ctx.save();ctx.translate(px2,py2);
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-7*sc,13*sc);ctx.lineTo(7*sc,13*sc);ctx.closePath();
+      ctx.fillStyle=SC2[k]+'bb';ctx.fill();
+      ctx.beginPath();ctx.moveTo(-9*sc,13*sc);ctx.lineTo(9*sc,13*sc);
+      ctx.strokeStyle=SC2[k];ctx.lineWidth=2*sc;ctx.stroke();ctx.restore();
+    }
+    const pm=proj(x,1.5,WTR/2),sc=Math.max(.5,Z*.5);
+    ctx.font=`bold ${Math.round(9*sc)}px IBM Plex Mono`;ctx.fillStyle='rgba(200,220,240,.75)';ctx.textAlign='center';
+    ctx.fillText(SN[k],OX+pm.px*Z,OY+pm.py*Z);
+    ctx.font=`${Math.round(7.5*sc)}px IBM Plex Mono`;ctx.fillStyle='rgba(120,150,180,.7)';
+    ctx.fillText(ST[k],OX+pm.px*Z,OY+pm.py*Z+10*sc);
+  });
+}
+function drawRxLbl(OX,OY,Z){
+  const rx=getRES()?.SER_I?.rx||[];
+  for(let k=0;k<4;k++){
+    const ry=(rx[k*2]?.ry||0)+(rx[k*2+1]?.ry||0);
+    const p=proj(SUP_XA[k],-2.8,WTR/2);
+    ctx.font='10px IBM Plex Mono';ctx.fillStyle='rgba(91,164,212,.7)';ctx.textAlign='center';
+    ctx.fillText(`R=${Math.abs(ry).toFixed(0)}kN`,OX+p.px*Z,OY+p.py*Z);
+  }
+}
+function drawTrain(OX,OY,Z){
+  const x0=Math.max(0,tX-VL),x1=Math.min(TOT,tX);if(x1<=x0)return;
+  ctx.save();const ZL=2.1,ZR=6.1;
+  const UNITS=[
+    {r0:0,  r1:18, type:'car', bc:'#2a4a8a',tc:'#3a6abf',fc:'#5a8adf'},
+    {r0:20, r1:38, type:'car', bc:'#2a4a8a',tc:'#3a6abf',fc:'#5a8adf'},
+    {r0:40, r1:58, type:'car', bc:'#2a4a8a',tc:'#3a6abf',fc:'#5a8adf'},
+    {r0:60, r1:78, type:'car', bc:'#1a3a6a',tc:'#2a5a9f',fc:'#4a7acf'},
+    {r0:82, r1:110,type:'loco',bc:'#8a1a10',tc:'#c02a1a',fc:'#e03a20'},
+  ];
+  const carH=2.8,carBot=0.3;
+  function face(pts,fc,al){
+    ctx.beginPath();ctx.moveTo(OX+pts[0].px*Z,OY+pts[0].py*Z);
+    for(let k=1;k<pts.length;k++)ctx.lineTo(OX+pts[k].px*Z,OY+pts[k].py*Z);
+    ctx.closePath();ctx.globalAlpha=al;ctx.fillStyle=fc;ctx.fill();
+    ctx.globalAlpha=al*.6;ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=0.8;ctx.stroke();ctx.globalAlpha=1;
+  }
+  for(const u of UNITS){
+    const cx0=tX-VL+u.r0,cx1=tX-VL+u.r1;
+    const vcx0=Math.max(0,cx0),vcx1=Math.min(TOT,cx1);if(vcx1<=vcx0)continue;
+    const h=u.type==='loco'?carH+0.4:carH,cab=u.type==='loco';
+    face([proj(vcx0,h,ZL),proj(vcx0,h,ZR),proj(vcx1,h,ZR),proj(vcx1,h,ZL)],u.tc,0.88);
+    face([proj(vcx0,carBot,ZL),proj(vcx0,h,ZL),proj(vcx1,h,ZL),proj(vcx1,carBot,ZL)],u.bc,0.7);
+    face([proj(vcx0,carBot,ZR),proj(vcx0,h,ZR),proj(vcx1,h,ZR),proj(vcx1,carBot,ZR)],u.bc,0.65);
+    if(vcx1===Math.min(TOT,cx1))face([proj(vcx1,carBot,ZL),proj(vcx1,h,ZL),proj(vcx1,h,ZR),proj(vcx1,carBot,ZR)],u.fc,cab?0.9:0.8);
+    if(!cab&&vcx1-vcx0>3){
+      const wStep=(vcx1-vcx0)/Math.max(1,Math.round((vcx1-vcx0)/5));
+      ctx.globalAlpha=0.55;ctx.strokeStyle='rgba(160,200,255,.7)';ctx.lineWidth=0.8;
+      for(let wx=vcx0+wStep*.5;wx<vcx1-1;wx+=wStep){
+        const wl=proj(wx,h+0.01,ZL+.5),wr=proj(wx,h+0.01,ZR-.5);
+        ctx.beginPath();ctx.moveTo(OX+wl.px*Z,OY+wl.py*Z);ctx.lineTo(OX+wr.px*Z,OY+wr.py*Z);ctx.stroke();
+      }ctx.globalAlpha=1;
+    }
+  }
+  for(const zs of [ZL,ZR]){
+    const pa=proj(x0,0.15,zs),pb=proj(x1,0.15,zs);
+    ctx.beginPath();ctx.moveTo(OX+pa.px*Z,OY+pa.py*Z);ctx.lineTo(OX+pb.px*Z,OY+pb.py*Z);
+    ctx.strokeStyle='rgba(180,160,120,.7)';ctx.lineWidth=3*Z*.25;ctx.lineCap='butt';ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawEigMode(OX,OY,Z){
+  const res=getEIG()[ES.tp];if(!res||!res[ES.mi])return;
+  const m=res[ES.mi];
+  const CM={V:'#60a5fa',L:'#34d399',T:'#f0c040'},lc=CM[ES.tp];
+  const tn={V:'수직굽힘',L:'횡방향',T:'비틀림'};
+  const mp=proj(PX[Math.floor(NTN/2)],16,WTR/2);
+  ctx.save();ctx.font="bold 13px 'IBM Plex Mono'";ctx.fillStyle=lc;ctx.textAlign='center';ctx.globalAlpha=.92;
+  ctx.fillText(`${ES.tp}${ES.mi+1} ${tn[ES.tp]}  f=${m.f.toFixed(3)}Hz  T=${m.T.toFixed(3)}s`,OX+mp.px*Z,OY+mp.py*Z);
+  ctx.globalAlpha=1;ctx.restore();
+  drawAllModes();drawModeProf();
+}
+function drawAllModes(){
+  const box=document.getElementById('modebox'),cv2=document.getElementById('cv-modes-all');
+  if(!box||!cv2)return;box.style.display='block';
+  const res=getEIG()[ES.tp],CM={V:'#60a5fa',L:'#34d399',T:'#f0c040'},lc=CM[ES.tp];
+  const W2=cv2.width,H2=cv2.height,pad=4,n=res.length;
+  const mc=cv2.getContext('2d');mc.clearRect(0,0,W2,H2);mc.fillStyle='#08090e';mc.fillRect(0,0,W2,H2);
+  const sw=(W2-2*pad)/n;
+  for(let k=0;k<n;k++){
+    const m=res[k];
+    if(k===ES.mi){mc.fillStyle='rgba(30,60,120,.4)';mc.fillRect(pad+k*sw,pad,sw,H2-2*pad);}
+    mc.beginPath();
+    m.d.forEach((d,i)=>{const px2=pad+k*sw+(PX[i]/TOT)*sw*.92,py2=H2/2-d*(H2/2-pad-2)*.9;i===0?mc.moveTo(px2,py2):mc.lineTo(px2,py2);});
+    mc.strokeStyle=k===ES.mi?lc:'rgba(100,140,180,.35)';mc.lineWidth=k===ES.mi?1.8:1;mc.stroke();
+    mc.font="8px 'IBM Plex Mono'";mc.fillStyle=k===ES.mi?lc:'rgba(100,140,180,.5)';mc.textAlign='center';
+    mc.fillText(`${ES.tp}${k+1}`,pad+k*sw+sw/2,H2-2);
+  }
+}
+function drawModeProf(){
+  const cv3=document.getElementById('cv-mode');if(!cv3)return;
+  const W3=cv3.width,H3=cv3.height;
+  const mc=cv3.getContext('2d');mc.clearRect(0,0,W3,H3);mc.fillStyle='#08090e';mc.fillRect(0,0,W3,H3);
+  const res=getEIG()[ES.tp];if(!res||!res[ES.mi])return;
+  const m=res[ES.mi];const lc={V:'#60a5fa',L:'#34d399',T:'#f0c040'}[ES.tp];
+  mc.beginPath();
+  m.d.forEach((d,i)=>{const px2=4+(PX[i]/TOT)*(W3-8),py2=H3/2-d*(H3/2-5)*.85;i===0?mc.moveTo(px2,py2):mc.lineTo(px2,py2);});
+  mc.strokeStyle=lc;mc.lineWidth=1.8;mc.stroke();
+  mc.beginPath();mc.moveTo(4,H3/2);mc.lineTo(W3-4,H3/2);mc.strokeStyle='rgba(255,255,255,.12)';mc.lineWidth=0.8;mc.stroke();
+}
+function drawMVProf(){
+  const cv3=document.getElementById('cv-mv');if(!cv3)return;
+  const W3=cv3.width,H3=cv3.height;
+  const mc=cv3.getContext('2d');mc.clearRect(0,0,W3,H3);mc.fillStyle='#08090e';mc.fillRect(0,0,W3,H3);
+  const mx=Math.max(...CD.map(Math.abs),1e-9);
+  mc.beginPath();
+  CD.forEach((d,i)=>{const px2=4+(PX[i]/TOT)*(W3-8),py2=H3/2+d/mx*(H3/2-4);i===0?mc.moveTo(px2,py2):mc.lineTo(px2,py2);});
+  mc.strokeStyle='#00ffe0';mc.lineWidth=1.8;mc.stroke();
+  mc.beginPath();mc.moveTo(4,H3/2);mc.lineTo(W3-4,H3/2);mc.strokeStyle='rgba(255,255,255,.12)';mc.lineWidth=0.8;mc.stroke();
+}
+function drawStlProf(){
+  const cv3=document.getElementById('cv-settle');if(!cv3)return;
+  const W3=cv3.width,H3=cv3.height;
+  const mc=cv3.getContext('2d');mc.clearRect(0,0,W3,H3);mc.fillStyle='#08090e';mc.fillRect(0,0,W3,H3);
+  const mx=Math.max(...CD.map(Math.abs),...CD_L.map(Math.abs),...CD_R.map(Math.abs),1e-9);
+  function dLine(data,col){
+    mc.beginPath();
+    data.forEach((d,i)=>{const px2=4+(PX[i]/TOT)*(W3-8),py2=H3/2+d/mx*(H3/2-4);i===0?mc.moveTo(px2,py2):mc.lineTo(px2,py2);});
+    mc.strokeStyle=col;mc.lineWidth=1.5;mc.stroke();
+  }
+  dLine(CD,'#00ffe0');dLine(CD_L,'rgba(96,165,250,.6)');dLine(CD_R,'rgba(52,211,153,.6)');
+  mc.beginPath();mc.moveTo(4,H3/2);mc.lineTo(W3-4,H3/2);mc.strokeStyle='rgba(255,255,255,.12)';mc.lineWidth=0.8;mc.stroke();
+}
+function drawDims(OX,OY,Z,W,H){
+  ctx.save();ctx.font="bold 12px 'IBM Plex Mono'";ctx.textAlign='center';
+  const cols=['rgba(96,165,250,.7)','rgba(52,211,153,.7)','rgba(96,165,250,.7)'];
+  let cx2=0;
+  for(let s=0;s<3;s++){
+    const mid=cx2+D.SPANS[s]/2;
+    const p=proj(mid,0,WTR/2);
+    ctx.fillStyle=cols[s];ctx.fillText(`${D.SPANS[s]}m`,OX+p.px*Z,OY+p.py*Z+18);
+    cx2+=D.SPANS[s];
+  }
+  ctx.restore();
+}
+function drawAxes(W,H){
+  const ax=W-55,ay=H-55;
+  ctx.save();
+  [['x','#f87171',[1,0,0]],['y','#60a5fa',[0,1,0]],['z','#34d399',[0,0,1]]].forEach(([lb,co,[dx,dy,dz]])=>{
+    const p=proj(dx*3,dy*3,dz*3),p0=proj(0,0,0);
+    ctx.beginPath();ctx.moveTo(ax+p0.px*3,ay+p0.py*3);ctx.lineTo(ax+p.px*3,ay+p.py*3);
+    ctx.strokeStyle=co;ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle=co;ctx.font='12px IBM Plex Mono';ctx.textAlign='center';
+    ctx.fillText(lb,ax+p.px*3+4,ay+p.py*3-3);
+  });
+  ctx.restore();
+}
+function drawSpanBar(W,H){
+  const bx=20,by=H-35,bw=W-40,bh=10;
+  ctx.fillStyle='rgba(15,20,35,.7)';ctx.fillRect(bx,by,bw,bh);
+  ['rgba(96,165,250,.5)','rgba(52,211,153,.5)','rgba(96,165,250,.5)'].forEach((col,s)=>{
+    const cx2=bx+SP.slice(0,s).reduce((a,v)=>a+bw*v/TOT,0),sw=bw*SP[s]/TOT;
+    ctx.fillStyle=col;ctx.fillRect(cx2,by,sw-1,bh);
+  });
+  if(AM==='moving'&&tX>-VL&&tX<TOT+10){
+    const x0=Math.max(0,tX-VL),x1=Math.min(TOT,tX);
+    ctx.fillStyle='rgba(255,107,53,.6)';ctx.fillRect(bx+bw*x0/TOT,by,bw*(x1-x0)/TOT,bh);
+  }
+}
+
+function s(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function updPanel(){
+  s('sv-f',(getEIG().V[0]?.f||0).toFixed(3)+'Hz');
+  const RES=getRES();
+  if(AM==='static'){
+    const r=RES[LC],d=r.mx,al=188.2,p=Math.min(200,d/al*100);
+    s('r-d',d.toFixed(2)+' mm');s('r-x','x='+r.mx_x+'m');s('r-rt',(p/100).toFixed(3));s('r-pct',p.toFixed(1)+'%');
+    s('sv-d',d.toFixed(1)+'mm');s('sv-r',p.toFixed(0)+'%');s('ft-lc',LC.replace(/_/g,' '));
+    const f=document.getElementById('gfill');
+    if(f){f.style.width=Math.min(100,p/2)+'%';const t=p/200;
+      f.style.background=t<.5?`linear-gradient(to right,#1e90ff,rgb(${lp(0,0,t*2)},${lp(255,255,t*2)},${lp(200,80,t*2)}))`:
+        `linear-gradient(to right,#00ffc8,rgb(${lp(0,255,(t-.5)*2)},${lp(255,50,(t-.5)*2)},${lp(80,50,(t-.5)*2)}))`;}
+  }else if(AM==='moving'){
+    const mm=CD.map(d=>d*1000),mx=Math.max(...mm.map(Math.abs));
+    maxMV=Math.max(maxMV,mx);
+    s('mv-d',mx.toFixed(2)+' mm');s('mv-mx',maxMV.toFixed(2)+' mm');
+    s('mv-pos',`x=${tX.toFixed(0)}m`);s('sv-d',mx.toFixed(1)+'mm');s('ft-lc',`순수LL x=${tX.toFixed(0)}m`);
+    drawMVProf();
+  }else if(AM==='eig'){
+    const m=getEIG()[ES.tp][ES.mi];if(!m)return;
+    s('er-f',m.f.toFixed(4)+' Hz');s('er-T',m.T.toFixed(4)+' s');
+    s('sv-d',m.f.toFixed(3)+'Hz');s('sv-r','T='+m.T.toFixed(3)+'s');s('ft-lc',`${ES.tp}${ES.mi+1}`);
+  }else if(AM==='settle'){
+    const diffs=CD_L.map((v,i)=>Math.abs(v-CD_R[i])*1000);
+    const smxAvg=Math.max(...CD.map(Math.abs),0),maxDiff=Math.max(...diffs,0);
+    s('st-add',(Math.max(...CD_L.map(Math.abs),...CD_R.map(Math.abs),0)*1000).toFixed(2)+' mm');
+    s('st-tot',(smxAvg*1000).toFixed(2)+' mm');s('st-diff',maxDiff.toFixed(2)+' mm');
+    s('sv-d',(smxAvg*1000).toFixed(1)+'mm');s('sv-r',(smxAvg*1000/188.2*100).toFixed(0)+'%');s('ft-lc','부등침하');
+    drawStlProf();
+  }
+}
+
+function eigLoop(ts){
+  if(!ES.anim)return;if(ES.lt===null)ES.lt=ts;
+  const dt=(ts-ES.lt)/1000;ES.lt=ts;
+  const freq=getEIG()[ES.tp][ES.mi]?.f||1;
+  ES.ph+=2*Math.PI*freq*dt*.15;draw();ES.aid=requestAnimationFrame(eigLoop);
+}
+function startAnim(){if(ES.aid)cancelAnimationFrame(ES.aid);ES.lt=null;ES.anim=true;ES.aid=requestAnimationFrame(eigLoop);const b=document.getElementById('btn-anim');if(b)b.textContent='⏸ 정지';}
+function stopAnim(){ES.anim=false;if(ES.aid){cancelAnimationFrame(ES.aid);ES.aid=null;}const b=document.getElementById('btn-anim');if(b)b.textContent='▶ 시작';draw();}
+function trainLoop(ts){
+  if(!playing)return;if(tLast===null)tLast=ts;
+  const dt=(ts-tLast)/1000;tLast=ts;tX+=tSpd*dt;
+  if(tX>TOT+VL){tX=-VL;maxMV=0;}
+  const sl=document.getElementById('sl-tx');if(sl)sl.value=tX;
+  s('lbl-tx',`x=${tX.toFixed(0)}m`);updCD();draw();requestAnimationFrame(trainLoop);
+}
+function updEigTable(){
+  const res=getEIG()[ES.tp],CM={V:'#60a5fa',L:'#34d399',T:'#f0c040'},lc=CM[ES.tp];
+  const tb=document.getElementById('eig-tbody');if(!tb)return;tb.innerHTML='';
+  res.forEach((m,k)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="color:${lc};cursor:pointer;background:${k===ES.mi?'#1a3a6a':'transparent'}" onclick="setEM(${k})">${ES.tp}${k+1}</td>
+      <td style="color:#7fc8ff">${m.f.toFixed(4)}</td><td style="color:#34d399">${m.T.toFixed(4)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+window.setView=function(m){cam.mode=m;document.querySelectorAll('.vt').forEach(b=>b.classList.remove('on'));const btn=document.getElementById('vt-'+m);if(btn)btn.classList.add('on');draw();};
+window.tog=function(k){LY[k]=!LY[k];const b=document.getElementById('btn-'+k);if(b)b.classList.toggle('on',LY[k]);draw();};
+window.setLC=function(lc){LC=lc;document.querySelectorAll('[id^="lc-"]').forEach(b=>b.classList.remove('on'));const b=document.getElementById('lc-'+lc);if(b)b.classList.add('on');updCD();draw();};
+window.setDM=function(m){
+  DM=m;
+  document.querySelectorAll('[id^="dm-"]').forEach(b=>b.classList.remove('on'));
+  const b=document.getElementById('dm-'+m);if(b)b.classList.add('on');
+  const lg=document.getElementById('force-legend');
+  if(lg) lg.style.display=(m==='force')?'':'none';
+  if(m==='force') drawForceLegend();
+  draw();
+};
+function drawForceLegend(){
+  const cv4=document.getElementById('cv-flegend'); if(!cv4) return;
+  const W4=cv4.width, H4=cv4.height;
+  const mc=cv4.getContext('2d');
+  // 그라디언트: 좌=최대압축, 중=0(회색), 우=최대인장
+  const maf=getMAF();
+  const FD=getFD(); const vals=Object.values(FD);
+  const mc_val=Math.min(...vals,0), mt_val=Math.max(...vals,0);
+  for(let px=0;px<W4;px++){
+    const ratio=(px/W4)*2-1; // -1 ~ +1
+    mc.fillStyle=fCol(ratio*maf);
+    mc.fillRect(px,0,1,H4);
+  }
+  // 0선 표시
+  mc.strokeStyle='rgba(255,255,255,0.4)'; mc.lineWidth=1;
+  mc.beginPath(); mc.moveTo(W4/2,0); mc.lineTo(W4/2,H4); mc.stroke();
+  // 범례 값 업데이트
+  const lcEl=document.getElementById('leg-mc');
+  const ltEl=document.getElementById('leg-mt');
+  if(lcEl) lcEl.textContent=mc_val.toFixed(0)+'kN';
+  if(ltEl) ltEl.textContent='+'+mt_val.toFixed(0)+'kN';
+}
+window.onSC=function(v){SC=parseInt(v);s('lbl-sc','×'+v);s('ft-sc','배율×'+v);draw();};
+window.setAM=function(m){
+  AM=m;stopAnim();playing=false;tLast=null;maxMV=0;
+  ['static','eig','moving','settle'].forEach(id=>{
+    document.getElementById(`p-${id}`).style.display=id===m?'':'none';
+    const b=document.getElementById(`am-${id}`);if(b)b.classList.toggle('on',id===m);
+  });
+  document.getElementById('modebox').style.display='none';
+  s('ft-mode',{static:'정적해석',eig:'고유치',moving:'이동하중',settle:'부등침하'}[m]);
+  updCD();
+  if(m==='eig'){updEigTable();draw();startAnim();}else draw();
+};
+window.setET=function(tp){ES.tp=tp;ES.mi=0;ES.ph=0;ES.lt=null;['V','L','T'].forEach(t=>{const b=document.getElementById(`et-${t}`);if(b)b.classList.toggle('on',t===tp);});updEigTable();draw();};
+window.setEM=function(mi){ES.mi=mi;ES.ph=0;ES.lt=null;for(let k=0;k<NM;k++){const b=document.getElementById(`em-${k}`);if(b)b.classList.toggle('on',k===mi);}updEigTable();draw();};
+window.onAmp=function(v){ES.amp=parseInt(v);s('lbl-amp','×'+v);draw();};
+window.toggleAnim=function(){if(ES.anim)stopAnim();else startAnim();};
+window.onTX=function(v){tX=parseFloat(v);s('lbl-tx',`x=${tX.toFixed(0)}m`);updCD();draw();};
+window.onSpd=function(v){tSpd=parseInt(v);const m={20:'매우느림',40:'느림',60:'보통',80:'보통',100:'빠름',140:'매우빠름',200:'최고속'};s('lbl-spd',m[v]||'보통');};
+window.togglePlay=function(){playing=!playing;tLast=null;const b=document.getElementById('btn-play');if(b)b.textContent=playing?'⏸ 정지':'▶ 자동주행';if(playing)requestAnimationFrame(trainLoop);};
+window.onSettle=function(){for(let k=0;k<8;k++){const v=parseInt(document.getElementById(`sl-s${k}`).value);SV[k]=v;s(`lbl-s${k}`,v+'mm');}updCD();draw();};
+
+function resize(){cv.width=cw.clientWidth;cv.height=cw.clientHeight;updCD();draw();}
+cv.addEventListener('mousedown',e=>{drag.on=true;drag.btn=e.button;drag.lx=e.clientX;drag.ly=e.clientY;e.preventDefault();});
+cv.addEventListener('mousemove',e=>{if(!drag.on)return;const dx=e.clientX-drag.lx,dy=e.clientY-drag.ly;if(drag.btn===0){cam.ry+=dx*.35;cam.rx+=dy*.35;}else{cam.tx+=dx;cam.ty+=dy;}drag.lx=e.clientX;drag.ly=e.clientY;draw();});
+cv.addEventListener('mouseup',()=>drag.on=false);
+cv.addEventListener('wheel',e=>{cam.zoom*=e.deltaY>0?.92:1.09;cam.zoom=Math.max(.2,Math.min(5,cam.zoom));draw();e.preventDefault();},{passive:false});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('resize',resize);
+
+resize();setLC('SER_I');
+</script>
+</body></html>

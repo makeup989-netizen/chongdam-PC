@@ -64,7 +64,6 @@
     letter-spacing: .06em;
     cursor: pointer;
     transition: all .15s;
-    text-decoration: none;
   }
   .header-tab:hover {
     border-color: var(--accent);
@@ -75,11 +74,6 @@
     border-color: var(--accent);
     color: var(--accent);
     background: rgba(0,229,204,.10);
-  }
-  .header-tab-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
   }
   .logo-dot {
     width:8px; height:8px; border-radius:50%;
@@ -290,16 +284,11 @@
       <div class="logo-text">CHONGDAM BRIDGE · DIGITAL TWIN</div>
       <div class="logo-sub">청담대교 계측 센서 실시간 모니터링</div>
     </div>
-    <!-- 상단 탭 -->
-    <div class="header-tabs">
-      <button class="header-tab active" onclick="void(0)" title="센서 모니터링 (현재 페이지)">
-        <div class="header-tab-dot"></div>
-        SENSOR MONITOR
-      </button>
-      <button class="header-tab" onclick="window.open('cheongdam_3d_viewer.html', '_blank')" title="구조해석 고유치 뷰어">
-        ⬡ STRUCTURE ANALYSIS
-      </button>
-    </div>
+  </div>
+  <div class="header-tabs">
+    <button class="header-tab active" title="센서 모니터링 (현재 페이지)">● SENSOR MONITOR</button>
+    <button class="header-tab" onclick="window.open('hangang_3d_comparison_7.html', '_blank')" title="상세 구조 모델">⬡ 상세모델</button>
+    <button class="header-tab" onclick="window.open('truss-2019-comparison-viewer_7.html', '_blank')" title="간략화 트러스 모델">⬡ 간략화모델</button>
   </div>
   <div class="header-right">
     <div class="status-badge"><div class="status-dot"></div>LIVE</div>
